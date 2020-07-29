@@ -28,7 +28,11 @@ jobs:
         echo "sdk.dir=${ANDROID_HOME}" > local.properties &&
         echo "ndk.dir=${ANDROID_HOME}/ndk/21.3.6528147" >> local.properties
     - name: 'Analyse'
-      run: ./gradlew detekt ktlint lintDebug
+      run: >
+        ./gradlew
+          detekt
+          ktlint
+          lintDebug
     - name: 'Unit tests'
       run: >
         ./gradlew
