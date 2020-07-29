@@ -43,3 +43,4 @@ jobs:
         ./gradlew :OpenSSL:assembleX86_64
         ./gradlew :SQLite3:amalgamate
         ./gradlew assembleSelekt
+      env: ANDROID_NDK_HOME: ${ANDROID_HOME}/ndk/21.3.6528147
