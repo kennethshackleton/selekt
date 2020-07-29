@@ -1,0 +1,33 @@
+name: 'Continous Integration'
+
+on:
+  pull-request:
+  push:
+    branches-ignore:
+      - 'main'
+
+jobs:
+  build-container:
+    name: 'Build container'
+    runs-on: ubuntu-latest
+    steps:
+      with:
+        java-version: adopt@1.8
+    - name: 'Install Build Tools'
+      run: echo 'y' | sudo ${ANDROID_HOME}/tools/bin/sdkmanager --install 'build-tools;30.0.0'
+    - name: 'Install CMake'
+      run: echo 'y' | sudo ${ANDROID_HOME}/tools/bin/sdkmanager --install 'cmake;3.10.2.4988404'
+    - name: 'Install NDK'
+      run: echo 'y' | sudo ${ANDROID_HOME}/tools/bin/sdkmanager --install 'ndk;21.3.6528147'
+    - name: 'Install Android SDK'
+      run: echo 'y' | sudo ${ANDROID_HOME}/tools/bin/sdkmanager --install 'platforms;android-30'
+  build-artifacts:
+    name: 'Build artifacts'
+    needs: build-container
+    runs-on: ubuntu-latest
+    steps:
+      with:
+        java-version: adopt@1.8
+    - uses: actions/checkout@v2
+    - name: 'Assemble Selekt'
+      run: ./gradlew assembleSelekt
