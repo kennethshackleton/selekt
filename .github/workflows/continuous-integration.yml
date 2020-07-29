@@ -44,4 +44,4 @@ jobs:
         ./gradlew :SQLite3:amalgamate
         ./gradlew assembleSelekt
       env:
-        ANDROID_NDK_HOME: ${ANDROID_HOME}/ndk/21.3.6528147
+        ANDROID_NDK_HOME: "${ANDROID_HOME}/ndk/21.3.6528147"
