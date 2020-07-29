@@ -11,6 +11,8 @@ jobs:
     name: 'Continuous Integration'
     runs-on: ubuntu-latest
     steps:
+    - name: 'Install system packages'
+      run: sudo apt-get install -y --no-install-recommends clang gcc make sed tcl
     - name: 'Install Build Tools'
       run: echo 'y' | sudo ${ANDROID_HOME}/tools/bin/sdkmanager --install 'build-tools;30.0.0'
     - name: 'Install CMake'
