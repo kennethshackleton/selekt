@@ -27,9 +27,21 @@ jobs:
       run: >
         echo "sdk.dir=${ANDROID_HOME}" > local.properties &&
         echo "ndk.dir=${ANDROID_HOME}/ndk/21.3.6528147" >> local.properties
-    - name: 'Analysis'
+    - name: 'Analyse'
       run: ./gradlew detekt ktlint lintDebug
-    - name: 'Unit test'
-      run: ./test_selekt.sh
+    - name: 'Unit tests'
+      run: >
+        ./gradlew
+          :AndroidLib:testDebugUnitTest
+          :AndroidSupportLib:testDebugUnitTest
+          :Commons:test
+          :Lib:test
+          :Pools:test
     - name: 'Build Selekt'
-      run: ./build_selekt.sh
+      run: >
+        ./gradlew :OpenSSL:assembleArm64-v8a &&
+        ./gradlew :OpenSSL:assembleArmeabi-v7a &&
+        ./gradlew :OpenSSL:assembleX86 &&
+        ./gradlew :OpenSSL:assembleX86_64 &&
+        ./gradlew :SQLite3:amalgamate &&
+        ./gradlew assembleSelekt
