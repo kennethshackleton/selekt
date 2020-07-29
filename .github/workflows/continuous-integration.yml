@@ -22,6 +22,8 @@ jobs:
     - name: 'Install Android SDK'
       run: echo 'y' | sudo ${ANDROID_HOME}/tools/bin/sdkmanager --install 'platforms;android-30'
     - uses: actions/checkout@v2
+      with:
+        submodules: true
     - uses: actions/setup-java@v1
       with:
         java-version: 1.8
