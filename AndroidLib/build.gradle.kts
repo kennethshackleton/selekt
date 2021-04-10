@@ -36,6 +36,10 @@ android {
     compileSdkVersion(Versions.ANDROID_SDK.version.toInt())
     buildToolsVersion(Versions.ANDROID_BUILD_TOOLS.version)
 
+    packagingOptions {
+        exclude("**/libc++_shared.so")
+    }
+
     defaultConfig {
         minSdkVersion(21)
         versionCode = 1
@@ -45,6 +49,12 @@ android {
 
         ndk {
             abiFilters.addAll(arrayOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64"))
+        }
+
+        externalNativeBuild {
+            cmake {
+                arguments.add("-DANDROID_STL=c++_shared")
+            }
         }
     }
 
@@ -69,6 +79,10 @@ android {
         }
     }
 
+    buildFeatures {
+        prefab = true
+    }
+
     externalNativeBuild {
         cmake {
             path("$rootDir/SQLite3/CMakeLists.txt")
@@ -82,6 +96,7 @@ dependencies {
     compileOnly(androidX("room", "runtime", Versions.ANDROIDX_ROOM.version))
     implementation(selekt("java", selektVersionName))
     implementation(selekt("sqlite3", selektVersionName))
+    implementation("com.android.ndk.thirdparty:openssl:1.1.1d-alpha-1")
     testImplementation("org.robolectric:robolectric:${Versions.ROBOLECTRIC}")
     testImplementation(androidX("lifecycle", "livedata-ktx", Versions.ANDROIDX_LIVE_DATA.version))
     testImplementation(androidX("room", "runtime", Versions.ANDROIDX_ROOM.version))
