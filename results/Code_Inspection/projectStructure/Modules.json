@@ -26,13 +26,13 @@
           "path": "file://$PROJECT_DIR$/AndroidCLI",
           "sourceFolders": [
             {
-              "path": "file://$PROJECT_DIR$/AndroidCLI/src/main/kotlin",
-              "type": "Source",
+              "path": "file://$PROJECT_DIR$/AndroidCLI/src/main/res",
+              "type": "Resource",
               "packagePrefix": ""
             },
             {
-              "path": "file://$PROJECT_DIR$/AndroidCLI/src/main/res",
-              "type": "Resource",
+              "path": "file://$PROJECT_DIR$/AndroidCLI/src/main/kotlin",
+              "type": "Source",
               "packagePrefix": ""
             }
           ]
@@ -244,8 +244,13 @@
           "path": "file://$PROJECT_DIR$/AndroidLib",
           "sourceFolders": [
             {
-              "path": "file://$PROJECT_DIR$/AndroidLib/src/debug/kotlin",
-              "type": "Source",
+              "path": "file://$PROJECT_DIR$/AndroidLib/src/test/kotlin",
+              "type": "TestSource",
+              "packagePrefix": ""
+            },
+            {
+              "path": "file://$PROJECT_DIR$/AndroidLib/src/test/resources",
+              "type": "TestResource",
               "packagePrefix": ""
             },
             {
@@ -259,13 +264,8 @@
               "packagePrefix": ""
             },
             {
-              "path": "file://$PROJECT_DIR$/AndroidLib/src/test/kotlin",
-              "type": "TestSource",
-              "packagePrefix": ""
-            },
-            {
-              "path": "file://$PROJECT_DIR$/AndroidLib/src/test/resources",
-              "type": "TestResource",
+              "path": "file://$PROJECT_DIR$/AndroidLib/src/debug/kotlin",
+              "type": "Source",
               "packagePrefix": ""
             }
           ]
@@ -1813,13 +1813,13 @@
           "path": "file://$PROJECT_DIR$/Lib/src/test",
           "sourceFolders": [
             {
-              "path": "file://$PROJECT_DIR$/Lib/src/test/kotlin",
-              "type": "TestSource",
+              "path": "file://$PROJECT_DIR$/Lib/src/test/resources",
+              "type": "TestResource",
               "packagePrefix": ""
             },
             {
-              "path": "file://$PROJECT_DIR$/Lib/src/test/resources",
-              "type": "TestResource",
+              "path": "file://$PROJECT_DIR$/Lib/src/test/kotlin",
+              "type": "TestSource",
               "packagePrefix": ""
             }
           ]
@@ -2341,13 +2341,13 @@
           "path": "file://$PROJECT_DIR$/SQLite3/src/main",
           "sourceFolders": [
             {
-              "path": "file://$PROJECT_DIR$/SQLite3/src/main/kotlin",
-              "type": "Source",
+              "path": "file://$PROJECT_DIR$/SQLite3/src/main/resources",
+              "type": "Resource",
               "packagePrefix": ""
             },
             {
-              "path": "file://$PROJECT_DIR$/SQLite3/src/main/resources",
-              "type": "Resource",
+              "path": "file://$PROJECT_DIR$/SQLite3/src/main/kotlin",
+              "type": "Source",
               "packagePrefix": ""
             }
           ]

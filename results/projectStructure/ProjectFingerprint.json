@@ -2,10 +2,10 @@
   "languages": [
     "Kotlin",
     "Plain text",
+    "XML",
     "Properties",
     "Shrinker Config",
     ".gitignore (GitIgnore)",
-    "XML",
     "Java",
     "JSON",
     "EditorConfig"
