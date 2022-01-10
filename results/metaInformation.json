@@ -1,0 +1,16 @@
+{
+  "total": 0,
+  "tools inspection": {
+    "Code Inspection": 0
+  },
+  "attributes": {
+    "vcs": {
+      "sarifIdea": {
+        "repositoryUri": "https://github.com/kennethshackleton/selekt",
+        "revisionId": "f2b46c3153eb64952d53c7cd2664f1a736f04b1a",
+        "branch": "main"
+      }
+    },
+    "deviceId": "200820300000000-6575-9d83-f944-9b46116a2c76"
+  }
+}

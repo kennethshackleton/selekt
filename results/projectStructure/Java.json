@@ -1,0 +1,108 @@
+{
+  "modules": [
+    {
+      "name": "Selekt",
+      "languageLevel": 11
+    },
+    {
+      "name": "Selekt.AndroidCLI",
+      "languageLevel": 8
+    },
+    {
+      "name": "Selekt.AndroidLib",
+      "languageLevel": 8
+    },
+    {
+      "name": "Selekt.AndroidLibBenchmark",
+      "languageLevel": 8
+    },
+    {
+      "name": "Selekt.AndroidLint",
+      "languageLevel": 11
+    },
+    {
+      "name": "Selekt.AndroidSQLCipher",
+      "languageLevel": 8
+    },
+    {
+      "name": "Selekt.Annotations",
+      "languageLevel": 11
+    },
+    {
+      "name": "Selekt.ApiLib",
+      "languageLevel": 11
+    },
+    {
+      "name": "Selekt.Lib",
+      "languageLevel": 11
+    },
+    {
+      "name": "Selekt.OpenSSL",
+      "languageLevel": 11
+    },
+    {
+      "name": "Selekt.SQLite3",
+      "languageLevel": 11
+    },
+    {
+      "name": "Selekt.buildSrc",
+      "languageLevel": 11
+    },
+    {
+      "name": "Selekt.AndroidLint.test",
+      "languageLevel": 11
+    },
+    {
+      "name": "Selekt.AndroidLint.main",
+      "languageLevel": 11
+    },
+    {
+      "name": "Selekt.Annotations.test",
+      "languageLevel": 11
+    },
+    {
+      "name": "Selekt.Annotations.main",
+      "languageLevel": 11
+    },
+    {
+      "name": "Selekt.ApiLib.test",
+      "languageLevel": 11
+    },
+    {
+      "name": "Selekt.ApiLib.main",
+      "languageLevel": 11
+    },
+    {
+      "name": "Selekt.Lib.jmh",
+      "languageLevel": 11
+    },
+    {
+      "name": "Selekt.Lib.test",
+      "languageLevel": 11
+    },
+    {
+      "name": "Selekt.Lib.main",
+      "languageLevel": 11
+    },
+    {
+      "name": "Selekt.Lib.integrationTest",
+      "languageLevel": 11
+    },
+    {
+      "name": "Selekt.SQLite3.test",
+      "languageLevel": 11
+    },
+    {
+      "name": "Selekt.SQLite3.main",
+      "languageLevel": 11
+    },
+    {
+      "name": "Selekt.buildSrc.test",
+      "languageLevel": 11
+    },
+    {
+      "name": "Selekt.buildSrc.main",
+      "languageLevel": 11
+    }
+  ]
+}
