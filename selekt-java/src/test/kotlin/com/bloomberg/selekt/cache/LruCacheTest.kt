@@ -14,9 +14,8 @@
  * limitations under the License.
  */
 
-package com.bloomberg.selekt
+package com.bloomberg.selekt.cache
 
-import com.bloomberg.selekt.cache.LruCache
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.mockito.kotlin.anyOrNull
