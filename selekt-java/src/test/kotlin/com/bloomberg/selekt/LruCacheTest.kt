@@ -16,7 +16,9 @@
 
 package com.bloomberg.selekt
 
+import com.bloomberg.selekt.cache.LruCache
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.inOrder
@@ -29,8 +31,50 @@ import org.mockito.kotlin.whenever
 import kotlin.test.assertFalse
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
+import kotlin.test.fail
 
 internal class LruCacheTest {
+    @Test
+    fun maxSizeAtLeastOne() {
+        val disposal: (Any) -> Unit = mock { onGeneric { invoke(it) } doReturn Unit }
+        assertThrows<IllegalArgumentException> {
+            LruCache(0, disposal)
+        }
+    }
+
+    @Test
+    fun get() {
+        val first = Any()
+        val disposal: (Any) -> Unit = mock { onGeneric { invoke(it) } doReturn Unit }
+        val cache = LruCache(1, disposal)
+        cache["1", { first }]
+        assertSame(first, cache["1", { fail() }])
+    }
+
+    @Test
+    fun getTwo() {
+        val first = Any()
+        val second = Any()
+        val disposal: (Any) -> Unit = mock { onGeneric { invoke(it) } doReturn Unit }
+        val cache = LruCache(2, disposal)
+        cache["1", { first }]
+        cache["2", { second }]
+        assertSame(first, cache["1", { fail() }])
+        assertSame(second, cache["2", { fail() }])
+    }
+
+    @Test
+    fun getAfterEvict() {
+        val first = Any()
+        val second = Any()
+        val disposal: (Any) -> Unit = mock { onGeneric { invoke(it) } doReturn Unit }
+        val cache = LruCache(1, disposal)
+        cache["1", { first }]
+        cache["2", { second }]
+        assertFalse(cache.containsKey("1"))
+        assertSame(second, cache["2", { fail() }])
+    }
+
     @Test
     fun evict() {
         val first = Any()
@@ -43,6 +87,7 @@ internal class LruCacheTest {
         inOrder(disposal) {
             verify(disposal, times(1)).invoke(same(first))
         }
+        assertSame(second, cache["2", { fail() }])
     }
 
     @Test
