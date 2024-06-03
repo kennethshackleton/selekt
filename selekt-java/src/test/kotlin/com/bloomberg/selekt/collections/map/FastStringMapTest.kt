@@ -17,6 +17,7 @@
 package com.bloomberg.selekt.collections.map
 
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.times
@@ -34,14 +35,14 @@ internal class FastStringMapTest {
     fun get() {
         val first = Any()
         val map = FastStringMap<Any>(1)
-        assertSame(first, map["1", { first }])
+        assertSame(first, map.getEntryElsePut("1") { first }.value)
     }
 
     @Test
     fun sizeOne() {
         val first = Any()
         val map = FastStringMap<Any>(1)
-        map["1", { first }]
+        map.getEntryElsePut("1") { first }
         assertEquals(1, map.size)
     }
 
@@ -49,8 +50,8 @@ internal class FastStringMapTest {
     fun getTwice() {
         val first = Any()
         val map = FastStringMap<Any>(1)
-        map["1", { first }]
-        assertSame(first, map["1", { fail() }])
+        map.getEntryElsePut("1") { first }
+        assertSame(first, map.getEntryElsePut("1") { fail() }.value)
     }
 
     @Test
@@ -58,9 +59,9 @@ internal class FastStringMapTest {
         val supplier = mock<() -> Any>()
         whenever(supplier.invoke()) doReturn Any()
         val map = FastStringMap<Any>(1)
-        val item = map["1", supplier]
+        val item = map.getEntryElsePut("1", supplier)
         verify(supplier, times(1)).invoke()
-        assertSame(item, map["1", supplier])
+        assertSame(item, map.getEntryElsePut("1", supplier))
     }
 
     @Test
@@ -68,8 +69,8 @@ internal class FastStringMapTest {
         val first = Any()
         val second = Any()
         val map = FastStringMap<Any>(64)
-        map["1", { first }]
-        map["2", { second }]
+        map.getEntryElsePut("1") { first }
+        map.getEntryElsePut("2") { second }
         assertEquals(2, map.size)
     }
 
@@ -78,10 +79,10 @@ internal class FastStringMapTest {
         val first = Any()
         val second = Any()
         val map = FastStringMap<Any>(1)
-        map["1", { first }]
-        map["2", { second }]
-        assertSame(first, map["1", { fail() }])
-        assertSame(second, map["2", { fail() }])
+        map.getEntryElsePut("1") { first }
+        map.getEntryElsePut("2") { second }
+        assertSame(first, map.getEntryElsePut("1") { fail() }.value)
+        assertSame(second, map.getEntryElsePut("2") { fail() }.value)
     }
 
     @Test
@@ -89,18 +90,18 @@ internal class FastStringMapTest {
         val first = Any()
         val second = Any()
         val map = FastStringMap<Any>(1)
-        map["1", { first }]
-        map["2", { second }]
-        assertSame(first, map["1", { fail() }])
-        assertSame(second, map["2", { fail() }])
+        map.getEntryElsePut("1") { first }
+        map.getEntryElsePut("2") { second }
+        assertSame(first, map.getEntryElsePut("1") { fail() }.value)
+        assertSame(second, map.getEntryElsePut("2") { fail() }.value)
     }
 
     @Test
     fun removeOne() {
         val first = Any()
         val map = FastStringMap<Any>(1)
-        map["1", { first }]
-        assertSame(first, map.remove("1"))
+        map.getEntryElsePut("1") { first }
+        assertSame(first, map.removeEntry("1").value)
     }
 
     @Test
@@ -108,10 +109,10 @@ internal class FastStringMapTest {
         val first = Any()
         val second = Any()
         val map = FastStringMap<Any>(2)
-        map["1", { first }]
-        map["2", { second }]
-        assertSame(first, map.remove("1"))
-        assertSame(second, map["2", { fail() }])
+        map.getEntryElsePut("1") { first }
+        map.getEntryElsePut("2") { second }
+        assertSame(first, map.removeEntry("1").value)
+        assertSame(second, map.getEntryElsePut("2") { fail() }.value)
     }
 
     @Test
@@ -119,25 +120,27 @@ internal class FastStringMapTest {
         val first = Any()
         val second = Any()
         val map = FastStringMap<Any>(1)
-        map["1", { first }]
-        map["2", { second }]
-        assertSame(first, map.remove("1"))
-        assertSame(second, map["2", { fail() }])
+        map.getEntryElsePut("1") { first }
+        map.getEntryElsePut("2") { second }
+        assertSame(first, map.removeEntry("1").value)
+        assertSame(second, map.getEntryElsePut("2") { fail() }.value)
     }
 
     @Test
     fun removeThenSize() {
         val first = Any()
         val map = FastStringMap<Any>(1)
-        map["1", { first }]
-        map.remove("1")
+        map.getEntryElsePut("1") { first }
+        map.removeEntry("1")
         assertEquals(0, map.size)
     }
 
     @Test
     fun removeWhenEmpty() {
         val map = FastStringMap<Any>(1)
-        assertNull(map.remove("1"))
+        assertThrows<NoSuchElementException> {
+            map.removeEntry("1")
+        }
         assertEquals(0, map.size)
     }
 
@@ -146,7 +149,7 @@ internal class FastStringMapTest {
         val supplier = mock<() -> Any>()
         whenever(supplier.invoke()) doReturn Any()
         val map = FastStringMap<Any>(1)
-        map["1", supplier]
+        map.getEntryElsePut("1", supplier)
         assertFalse(map.containsKey("2"))
     }
 
@@ -155,7 +158,7 @@ internal class FastStringMapTest {
         val supplier = mock<() -> Any>()
         whenever(supplier.invoke()) doReturn Any()
         val map = FastStringMap<Any>(1)
-        map["1", supplier]
+        map.getEntryElsePut("1", supplier)
         assertTrue(map.containsKey("1"))
     }
 }

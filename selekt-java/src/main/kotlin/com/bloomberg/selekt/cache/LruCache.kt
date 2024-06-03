@@ -27,14 +27,14 @@ class LruCache<T : Any>(maxSize: Int, private val disposal: (T) -> Unit) {
     internal val store = FastLinkedStringMap(maxSize, maxSize shl 1, disposal)
 
     fun evict(key: String) {
-        store.remove(key)
+        store.removeEntry(key)
     }
 
     fun evictAll() {
         TODO()
     }
 
-    operator fun get(key: String, supplier: () -> T): T = store[key, supplier]
+    operator fun get(key: String, supplier: () -> T): T = store.getElsePut(key, supplier)
 
     fun containsKey(key: String) = store.containsKey(key)
 }

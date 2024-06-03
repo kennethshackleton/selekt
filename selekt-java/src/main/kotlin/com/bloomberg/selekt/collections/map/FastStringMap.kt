@@ -19,11 +19,11 @@ package com.bloomberg.selekt.collections.map
 /**
  * @param capacity a power of two.
  */
-class FastStringMap<T>(capacity: Int) {
+open class FastStringMap<T>(capacity: Int) {
     val size: Int
         inline get() = _size
     var _size: Int = 0
-    val store = arrayOfNulls<Entry<Any?>>(capacity)
+    val store = arrayOfNulls<Entry<T>>(capacity)
     private val hashLimit = capacity - 1
 
     fun isEmpty() = 0 == _size
@@ -36,87 +36,91 @@ class FastStringMap<T>(capacity: Int) {
             if (entry.hashCode == hashCode && entry.key == key) {
                 return true
             }
-            entry = entry.next
+            entry = entry.after
         }
         return false
     }
 
-    inline operator fun get(
+    inline fun getEntryElsePut(
         key: String,
         supplier: () -> T
-    ): T {
+    ): Entry<T> {
         val hashCode = hash(key)
         val index = hashIndex(hashCode)
         var entry = store[index]
         while (entry != null) {
             if (entry.hashCode == hashCode && entry.key == key) {
-                @Suppress("UNCHECKED_CAST")
-                return entry.value as T
+                return entry
             }
-            entry = entry.next
+            entry = entry.after
         }
         return addAssociation(index, hashCode, key, supplier())
     }
 
-    fun remove(key: String): T? {
+    open fun removeEntry(key: String): Entry<T> {
         val hashCode = hash(key)
         val index = hashIndex(hashCode)
         var entry = store[index]
-        var previous: Entry<Any?>? = null
+        var previous: Entry<T>? = null
         while (entry != null) {
             if (entry.hashCode == hashCode && entry.key == key) {
-                @Suppress("UNCHECKED_CAST")
-                return removeAssociation(entry, previous) as T
+                return removeAssociation(entry, previous)
             }
             previous = entry
-            entry = entry.next
+            entry = entry.after
         }
-        return null
+        throw NoSuchElementException()
     }
 
     @Suppress("UNCHECKED_CAST")
     fun removeEntry(entry: Entry<T>): T? {
         var current = store[entry.index]
-        var previous: Entry<Any?>? = null
+        var previous: Entry<T>? = null
         while (current != null) {
             if (current === entry) {
                 return removeAssociation(current, previous) as T
             }
             previous = current
-            current = current.next
+            current = current.after
         }
         return null
     }
 
-    fun addAssociation(
+    open fun addAssociation(
         index: Int,
         hashCode: Int,
         key: String,
         value: T
-    ): T {
-        store[index] = Entry(index, hashCode, key, value, store[index])
+    ): Entry<T> = createEntry(index, hashCode, key, value).also {
+        store[index] = it
         _size += 1
-        return value
     }
 
+    open fun createEntry(
+        index: Int,
+        hashCode: Int,
+        key: String,
+        value: T
+    ): Entry<T> = Entry(index, hashCode, key, value, store[index])
+
     private fun removeAssociation(
-        entry: Entry<Any?>,
-        previousEntry: Entry<Any?>?
-    ): Any? {
+        entry: Entry<T>,
+        previousEntry: Entry<T>?
+    ): Entry<T> {
         if (previousEntry == null) {
-            store[entry.index] = entry.next
+            store[entry.index] = entry.after
         } else {
-            previousEntry.next = entry.next
+            previousEntry.after = entry.after
         }
         _size -= 1
-        return entry.reset()
+        return entry
     }
 
     fun hash(key: String): Int = key.hashCode()
 
     fun hashIndex(hashCode: Int): Int = hashCode and hashLimit
 
-    class Entry<T>(
+    open class Entry<T>(
         @JvmField
         var index: Int,
         @JvmField
@@ -126,12 +130,12 @@ class FastStringMap<T>(capacity: Int) {
         @JvmField
         var value: T?,
         @JvmField
-        var next: Entry<T?>?
+        var after: Entry<T>?
     ) {
         fun reset(): T? = value.also { _ ->
             key = ""
             value = null
-            next = null
+            after = null
         }
     }
 }

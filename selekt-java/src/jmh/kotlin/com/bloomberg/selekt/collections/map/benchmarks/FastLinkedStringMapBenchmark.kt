@@ -41,27 +41,27 @@ open class FastLinkedStringMapBenchmark {
     @Benchmark
     @BenchmarkMode(Mode.Throughput)
     fun getEntry(input: LinkedMapInput) = input.smallMap.run {
-        this["1", { "" }]
+        getElsePut("1") { "" }
     }
 
     @Benchmark
     @BenchmarkMode(Mode.Throughput)
     fun getEntries(input: LinkedMapInput) = input.largeMap.run {
-        this["1", { "" }]
-        this["2", { "" }]
+        getElsePut("1") { "" }
+        getElsePut("2") { "" }
     }
 
     @Benchmark
     @BenchmarkMode(Mode.Throughput)
     fun getEntriesWithCollision(input: LinkedMapInput) = input.smallMap.run {
-        this["1", { "" }]
-        this["2", { "" }]
+        getElsePut("1") { "" }
+        getElsePut("2") { "" }
     }
 
     @Benchmark
     @BenchmarkMode(Mode.Throughput)
     fun getThenRemoveEntry(input: LinkedMapInput) = input.smallMap.run {
-        this["1", { "" }]
-        remove("1")
+        getElsePut("1") { "" }
+        removeEntry("1")
     }
 }

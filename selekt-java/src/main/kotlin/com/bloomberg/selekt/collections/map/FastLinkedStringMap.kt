@@ -20,37 +20,25 @@ class FastLinkedStringMap<T>(
     private val maxSize: Int,
     capacity: Int,
     private val disposal: (T) -> Unit
-) {
-    private val store = FastStringMap<Node<T>>(capacity)
-    private var head: Node<T>? = null
-    private var tail: Node<T>? = null
+) : FastStringMap<T>(capacity) {
+    private var head: LinkedEntry<T>? = null
+    private var tail: LinkedEntry<T>? = null
 
-    fun containsKey(key: String): Boolean = store.containsKey(key)
-
-    operator fun get(
+    fun getElsePut(
         key: String,
         supplier: () -> T
-    ): T = store[key, {
-        if (store.size >= maxSize) {
-            // Recycle the tail node.
-            removeLast().apply {
-                this.key = key
-                value = supplier()
-            }
-        } else {
-            Node(key, supplier())
+    ): T = super.getEntryElsePut(key) {
+        if (super.size >= maxSize) {
+            removeLast()
         }
-    }].also {
-        putFirst(it)
-    }.value
+        supplier()
+    }.value!!
 
-    fun remove(key: String) {
-        store.remove(key)?.let {
-            disposal(it.unlink().value)
-        }
+    fun removeKey(key: String) {
+        disposal((super.removeEntry(key) as LinkedEntry<T>).unlink().value!!)
     }
 
-    private fun Node<T>.unlink() = apply {
+    private fun LinkedEntry<T>.unlink(): Entry<T> = apply {
         previous?.let { it.next = next }
         next?.let { it.previous = previous }
         if (this === head) {
@@ -65,7 +53,7 @@ class FastLinkedStringMap<T>(
 
     @PublishedApi
     @JvmSynthetic
-    internal fun putFirst(node: Node<T>): Unit = node.run {
+    internal fun putFirst(node: LinkedEntry<T>): Unit = node.run {
         if (this === head) {
             return@run
         }
@@ -83,25 +71,43 @@ class FastLinkedStringMap<T>(
         }
     }
 
+    override fun addAssociation(
+        index: Int,
+        hashCode: Int,
+        key: String,
+        value: T
+    ): Entry<T> = (super.addAssociation(index, hashCode, key, value) as LinkedEntry<T>).also {
+        putFirst(it)
+    }
+
+    override fun createEntry(
+        index: Int,
+        hashCode: Int,
+        key: String,
+        value: T
+    ): Entry<T> = LinkedEntry(index, hashCode, key, value, store[index])
+
     @PublishedApi
     @JvmSynthetic
-    internal fun removeLast(): Node<T> = tail!!.apply {
+    internal fun removeLast(): LinkedEntry<T> = tail!!.apply {
         previous?.let { it.next = null } ?: run { head = null }
         tail = previous
         previous = null
-        store.remove(key)
-        disposal(value)
+        super.removeEntry(key)
+        disposal(value!!)
     }
 
-    class Node<T>(
+    @PublishedApi
+    internal class LinkedEntry<T>(
+        index: Int,
+        hashCode: Int,
+        key: String,
+        value: T,
+        after: Entry<T>?
+    ) : Entry<T>(index, hashCode, key, value, after) {
         @JvmField
-        var key: String,
+        var previous: LinkedEntry<T>? = null
         @JvmField
-        var value: T
-    ) {
-        @JvmField
-        var previous: Node<T>? = null
-        @JvmField
-        var next: Node<T>? = null
+        var next: LinkedEntry<T>? = null
     }
 }

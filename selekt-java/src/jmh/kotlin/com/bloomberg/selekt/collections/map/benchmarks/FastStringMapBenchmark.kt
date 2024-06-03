@@ -39,20 +39,20 @@ open class FastStringMapBenchmark {
     @Benchmark
     @BenchmarkMode(Mode.Throughput)
     fun getEntry(input: MapInput) = input.map.run {
-        this["1", { "" }]
+        getEntryElsePut("1") { "" }
     }
 
     @Benchmark
     @BenchmarkMode(Mode.Throughput)
     fun getEntryWithCollision(input: MapInput) = input.map.run {
-        this["1", { "" }]
-        this["2", { "" }]
+        getEntryElsePut("1") { "" }
+        getEntryElsePut("2") { "" }
     }
 
     @Benchmark
     @BenchmarkMode(Mode.Throughput)
     fun getThenRemoveEntry(input: MapInput) = input.map.run {
-        this["1", { "" }]
-        remove("1")
+        getEntryElsePut("1") { "" }
+        removeEntry("1")
     }
 }
