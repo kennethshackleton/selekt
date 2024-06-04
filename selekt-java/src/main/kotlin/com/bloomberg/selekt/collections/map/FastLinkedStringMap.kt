@@ -23,13 +23,14 @@ class FastLinkedStringMap<T>(
 ) : FastStringMap<T>(capacity) {
     private var head: LinkedEntry<T>? = null
     private var tail: LinkedEntry<T>? = null
+    private var spare: LinkedEntry<T>? = null
 
     fun getElsePut(
         key: String,
         supplier: () -> T
     ): T = super.getEntryElsePut(key) {
         if (super.size >= maxSize) {
-            removeLast()
+            spare = removeLastEntry()
         }
         supplier()
     }.value!!
@@ -85,11 +86,17 @@ class FastLinkedStringMap<T>(
         hashCode: Int,
         key: String,
         value: T
-    ): Entry<T> = LinkedEntry(index, hashCode, key, value, store[index])
+    ): Entry<T> {
+        spare?.let {
+            spare = null
+            return it.update(index, hashCode, key, value, store[index])
+        }
+        return LinkedEntry(index, hashCode, key, value, store[index])
+    }
 
     @PublishedApi
     @JvmSynthetic
-    internal fun removeLast(): LinkedEntry<T> = tail!!.apply {
+    internal fun removeLastEntry(): LinkedEntry<T> = tail!!.apply {
         previous?.let { it.next = null } ?: run { head = null }
         tail = previous
         previous = null
@@ -109,5 +116,20 @@ class FastLinkedStringMap<T>(
         var previous: LinkedEntry<T>? = null
         @JvmField
         var next: LinkedEntry<T>? = null
+
+        @Suppress("NOTHING_TO_INLINE")
+        inline fun update(
+            index: Int,
+            hashCode: Int,
+            key: String,
+            value: T,
+            after: Entry<T>?
+        ) = apply {
+            this.index = index
+            this.hashCode = hashCode
+            this.key = key
+            this.value = value
+            this.after = after
+        }
     }
 }
