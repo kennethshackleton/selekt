@@ -39,13 +39,13 @@ open class LruCacheBenchmark {
     @Benchmark
     @BenchmarkMode(Mode.Throughput)
     fun getEntry(input: CacheInput) = input.cache.run {
-        this["1", {}]
+        get("1") {}
     }
 
     @Benchmark
     @BenchmarkMode(Mode.Throughput)
     fun getEntryWithEviction(input: CacheInput) = input.cache.run {
-        this["1", {}]
-        this["2", {}]
+        get("1") {}
+        get("2") {}
     }
 }

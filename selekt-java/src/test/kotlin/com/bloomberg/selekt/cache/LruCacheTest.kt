@@ -37,8 +37,8 @@ internal class LruCacheTest {
         val first = Any()
         val disposal: (Any) -> Unit = mock { onGeneric { invoke(it) } doReturn Unit }
         val cache = LruCache(1, disposal)
-        cache["1", { first }]
-        assertSame(first, cache["1", { fail() }])
+        cache.get("1") { first }
+        assertSame(first, cache.get("1") { fail() })
     }
 
     @Test
@@ -47,10 +47,10 @@ internal class LruCacheTest {
         val second = Any()
         val disposal: (Any) -> Unit = mock { onGeneric { invoke(it) } doReturn Unit }
         val cache = LruCache(2, disposal)
-        cache["1", { first }]
-        cache["2", { second }]
-        assertSame(first, cache["1", { fail() }])
-        assertSame(second, cache["2", { fail() }])
+        cache.get("1") { first }
+        cache.get("2") { second }
+        assertSame(first, cache.get("1") { fail() })
+        assertSame(second, cache.get("2") { fail() })
     }
 
     @Test
@@ -59,10 +59,10 @@ internal class LruCacheTest {
         val second = Any()
         val disposal: (Any) -> Unit = mock { onGeneric { invoke(it) } doReturn Unit }
         val cache = LruCache(1, disposal)
-        cache["1", { first }]
-        cache["2", { second }]
+        cache.get("1") { first }
+        cache.get("2") { second }
         assertFalse(cache.containsKey("1"))
-        assertSame(second, cache["2", { fail() }])
+        assertSame(second, cache.get("2") { fail() })
     }
 
     @Test
@@ -71,13 +71,13 @@ internal class LruCacheTest {
         val second = Any()
         val disposal: (Any) -> Unit = mock { onGeneric { invoke(it) } doReturn Unit }
         val cache = LruCache(2, disposal)
-        cache["1", { first }]
-        cache["2", { second }]
+        cache.get("1") { first }
+        cache.get("2") { second }
         cache.evict("1")
         inOrder(disposal) {
             verify(disposal, times(1)).invoke(same(first))
         }
-        assertSame(second, cache["2", { fail() }])
+        assertSame(second, cache.get("2") { fail() })
     }
 
     @Test
@@ -86,8 +86,8 @@ internal class LruCacheTest {
         val second = Any()
         val disposal: (Any) -> Unit = mock { onGeneric { invoke(it) } doReturn Unit }
         val cache = LruCache(2, disposal)
-        cache["1", { first }]
-        cache["2", { second }]
+        cache.get("1") { first }
+        cache.get("2") { second }
         cache.evictAll()
         inOrder(disposal) {
             verify(disposal, times(1)).invoke(same(first))
@@ -109,8 +109,8 @@ internal class LruCacheTest {
         val second = Any()
         val disposal: (Any) -> Unit = mock { onGeneric { invoke(it) } doReturn Unit }
         val cache = LruCache(1, disposal)
-        cache["1", { first }]
-        cache["2", { second }]
+        cache.get("1") { first }
+        cache.get("2") { second }
         inOrder(disposal) {
             verify(disposal, times(1)).invoke(same(first))
         }
@@ -122,9 +122,9 @@ internal class LruCacheTest {
         val supplier = mock<() -> Any>()
         whenever(supplier.invoke()) doReturn Any()
         val cache = LruCache(1, disposal)
-        val item = cache["1", supplier]
+        val item = cache.get("1", supplier)
         verify(supplier, times(1)).invoke()
-        assertSame(item, cache["1", supplier])
+        assertSame(item, cache.get("1", supplier))
     }
 
     @Test
@@ -133,7 +133,7 @@ internal class LruCacheTest {
         val supplier = mock<() -> Any>()
         whenever(supplier.invoke()) doReturn Any()
         val cache = LruCache(1, disposal)
-        cache["1", supplier]
+        cache.get("1", supplier)
         assertFalse(cache.containsKey("2"))
     }
 
@@ -143,7 +143,7 @@ internal class LruCacheTest {
         val supplier = mock<() -> Any>()
         whenever(supplier.invoke()) doReturn Any()
         val cache = LruCache(1, disposal)
-        cache["1", supplier]
+        cache.get("1", supplier)
         assertTrue(cache.containsKey("1"))
     }
 }
