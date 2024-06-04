@@ -17,23 +17,27 @@
 package com.bloomberg.selekt.collections.map
 
 class FastLinkedStringMap<T>(
-    private val maxSize: Int,
+    @PublishedApi
+    internal val maxSize: Int,
     capacity: Int,
     private val disposal: (T) -> Unit
 ) : FastStringMap<T>(capacity) {
     private var head: LinkedEntry<T>? = null
     private var tail: LinkedEntry<T>? = null
-    private var spare: LinkedEntry<T>? = null
+    @PublishedApi
+    internal var spare: LinkedEntry<T>? = null
 
-    fun getElsePut(
+    inline fun getElsePut(
         key: String,
         supplier: () -> T
-    ): T = super.getEntryElsePut(key) {
-        if (super.size >= maxSize) {
+    ): T {
+        if (size >= maxSize) {
             spare = removeLastEntry()
         }
-        supplier()
-    }.value!!
+        val hashCode = hash(key)
+        val index = hashIndex(hashCode)
+        return (entryMatching(index, hashCode, key) ?: addAssociation(index, hashCode, key, supplier())).value!!
+    }
 
     fun removeKey(key: String) {
         disposal((super.removeEntry(key) as LinkedEntry<T>).unlink().value!!)

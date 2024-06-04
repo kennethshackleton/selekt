@@ -103,6 +103,19 @@ open class FastStringMap<T>(capacity: Int) {
         value: T
     ): Entry<T> = Entry(index, hashCode, key, value, store[index])
 
+    @Suppress("NOTHING_TO_INLINE")
+    @PublishedApi
+    internal inline fun entryMatching(index: Int, hashCode: Int, key: String): Entry<T>? {
+        var entry = store[index]
+        while (entry != null) {
+            if (entry.hashCode == hashCode && entry.key == key) {
+                return entry
+            }
+            entry = entry.after
+        }
+        return null
+    }
+
     private fun removeAssociation(
         entry: Entry<T>,
         previousEntry: Entry<T>?
