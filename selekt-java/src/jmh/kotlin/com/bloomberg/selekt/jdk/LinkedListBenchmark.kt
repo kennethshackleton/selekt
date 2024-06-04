@@ -25,7 +25,6 @@ import org.openjdk.jmh.annotations.Setup
 import org.openjdk.jmh.annotations.State
 import java.util.LinkedList
 
-
 @State(Scope.Thread)
 open class LinkedListInput {
     internal lateinit var list: LinkedList<Node>
