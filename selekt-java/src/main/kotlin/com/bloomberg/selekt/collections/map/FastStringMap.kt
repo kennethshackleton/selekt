@@ -22,7 +22,9 @@ package com.bloomberg.selekt.collections.map
 open class FastStringMap<T>(capacity: Int) {
     val size: Int
         inline get() = _size
+    @JvmField
     var _size: Int = 0
+    @JvmField
     val store = arrayOfNulls<Entry<T>>(capacity)
     private val hashLimit = capacity - 1
 

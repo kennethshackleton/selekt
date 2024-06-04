@@ -25,6 +25,7 @@ class FastLinkedStringMap<T>(
     private var head: LinkedEntry<T>? = null
     private var tail: LinkedEntry<T>? = null
     @PublishedApi
+    @JvmField
     internal var spare: LinkedEntry<T>? = null
 
     inline fun getElsePut(
