@@ -31,12 +31,14 @@ class FastLinkedStringMap<T>(
         key: String,
         supplier: () -> T
     ): T {
-        if (size >= maxSize) {
-            spare = removeLastEntry()
-        }
         val hashCode = hash(key)
         val index = hashIndex(hashCode)
-        return (entryMatching(index, hashCode, key) ?: addAssociation(index, hashCode, key, supplier())).value!!
+        return (entryMatching(index, hashCode, key) ?: run {
+            if (size >= maxSize) {
+                spare = removeLastEntry()
+            }
+            addAssociation(index, hashCode, key, supplier())
+        }).value!!
     }
 
     fun removeKey(key: String) {
