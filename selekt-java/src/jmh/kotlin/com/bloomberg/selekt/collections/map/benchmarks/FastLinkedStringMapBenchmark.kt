@@ -64,4 +64,11 @@ open class FastLinkedStringMapBenchmark {
         getElsePut("1") { "" }
         removeEntry("1")
     }
+
+    @Benchmark
+    @BenchmarkMode(Mode.Throughput)
+    fun getThenRemoveKey(input: LinkedMapInput) = input.smallMap.run {
+        getElsePut("1") { "" }
+        removeKey("1")
+    }
 }
