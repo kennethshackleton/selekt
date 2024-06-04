@@ -34,7 +34,7 @@ class LruCache<T : Any>(maxSize: Int, disposal: (T) -> Unit) {
         TODO()
     }
 
-    operator fun get(key: String, supplier: () -> T): T = store.getElsePut(key, supplier)
+    inline operator fun get(key: String, supplier: () -> T): T = store.getElsePut(key, supplier)
 
     fun containsKey(key: String) = store.containsKey(key)
 }
