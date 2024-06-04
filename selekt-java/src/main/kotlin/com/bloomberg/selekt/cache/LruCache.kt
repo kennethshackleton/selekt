@@ -20,14 +20,14 @@ import com.bloomberg.selekt.collections.map.FastLinkedStringMap
 import javax.annotation.concurrent.NotThreadSafe
 
 @NotThreadSafe
-class LruCache<T : Any>(maxSize: Int, private val disposal: (T) -> Unit) {
+class LruCache<T : Any>(maxSize: Int, disposal: (T) -> Unit) {
     @PublishedApi
     @JvmField
     @JvmSynthetic
     internal val store = FastLinkedStringMap(maxSize, maxSize shl 1, disposal)
 
     fun evict(key: String) {
-        store.removeEntry(key)
+        store.removeKey(key)
     }
 
     fun evictAll() {
