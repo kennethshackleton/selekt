@@ -48,13 +48,13 @@ open class LinkedListBenchmark {
     @Benchmark
     @BenchmarkMode(Mode.Throughput)
     fun getFirst(input: LinkedListInput) = input.list.run {
-        first()
+        firstOrNull()
     }
 
     @Benchmark
     @BenchmarkMode(Mode.Throughput)
     fun getEntries(input: LinkedListInput) = input.list.run {
-        val first = first()
-        first.next
+        val first = firstOrNull()
+        first?.next
     }
 }

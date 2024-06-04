@@ -38,13 +38,13 @@ open class ArrayBenchmark {
     @Benchmark
     @BenchmarkMode(Mode.Throughput)
     fun getFirst(input: ArrayInput) = input.array.run {
-        first()
+        firstOrNull()
     }
 
     @Benchmark
     @BenchmarkMode(Mode.Throughput)
     fun getEntries(input: ArrayInput) = input.array.run {
-        first()
+        firstOrNull()
         this[1]
     }
 }

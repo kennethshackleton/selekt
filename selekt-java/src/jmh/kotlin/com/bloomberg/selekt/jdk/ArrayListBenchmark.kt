@@ -41,13 +41,13 @@ open class ArrayListBenchmark {
     @Benchmark
     @BenchmarkMode(Mode.Throughput)
     fun getFirst(input: ArrayListInput) = input.list.run {
-        first()
+        firstOrNull()
     }
 
     @Benchmark
     @BenchmarkMode(Mode.Throughput)
     fun getEntries(input: ArrayListInput) = input.list.run {
-        first()
+        firstOrNull()
         this[1]
     }
 }
