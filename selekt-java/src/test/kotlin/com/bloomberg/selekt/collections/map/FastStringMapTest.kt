@@ -22,6 +22,10 @@ import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
+<<<<<<< Updated upstream
+=======
+import org.mockito.kotlin.verifyNoInteractions
+>>>>>>> Stashed changes
 import org.mockito.kotlin.verifyNoMoreInteractions
 import org.mockito.kotlin.whenever
 import kotlin.test.assertEquals
