@@ -22,3 +22,10 @@ inline fun Int.forUntil(other: Int, block: (Int) -> Unit) {
         block(i++)
     }
 }
+
+inline fun Int.forUntilDown(other: Int, block: (Int) -> Unit) {
+    var i = this
+    while (i > other) {
+        block(i--)
+    }
+}

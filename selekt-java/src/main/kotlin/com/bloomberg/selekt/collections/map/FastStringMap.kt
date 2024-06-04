@@ -25,22 +25,16 @@ open class FastStringMap<T>(capacity: Int) {
     @JvmField
     var _size: Int = 0
     @JvmField
-    val store = arrayOfNulls<Entry<T>>(capacity)
+    val store = arrayOfNulls<FastBucket<Entry<T>>>(capacity)
     private val hashLimit = capacity - 1
+    private var spare: FastBucket<Entry<T>>? = null
 
     fun isEmpty() = 0 == _size
 
     fun containsKey(key: String): Boolean {
         val hashCode = hash(key)
         val index = hashIndex(hashCode)
-        var entry = store[index]
-        while (entry != null) {
-            if (entry.hashCode == hashCode && entry.key == key) {
-                return true
-            }
-            entry = entry.after
-        }
-        return false
+        return store[index]?.firstOrNull(hashCode, key) != null
     }
 
     inline fun getEntryElsePut(
@@ -49,108 +43,75 @@ open class FastStringMap<T>(capacity: Int) {
     ): Entry<T> {
         val hashCode = hash(key)
         val index = hashIndex(hashCode)
-        var entry = store[index]
-        while (entry != null) {
-            if (entry.hashCode == hashCode && entry.key == key) {
-                return entry
-            }
-            entry = entry.after
+        return bucketAt(index).let {
+            it.firstOrNull(hashCode, key) ?: addAssociation(it, hashCode, key, supplier())
         }
-        return addAssociation(index, hashCode, key, supplier())
+    }
+
+    @PublishedApi
+    internal fun bucketAt(index: Int) = store[index] ?: (spare ?: FastBucket(1)).also {
+        store[index] = it
+        spare = null
     }
 
     open fun removeEntry(key: String): Entry<T> {
         val hashCode = hash(key)
         val index = hashIndex(hashCode)
-        var entry = store[index]
-        var previous: Entry<T>? = null
-        while (entry != null) {
-            if (entry.hashCode == hashCode && entry.key == key) {
-                return removeAssociation(entry, previous)
+        val bucket = store[index]
+        return (bucket?.removeFirst {
+            this.hashCode == hashCode && this.key == key
+        } ?: throw NoSuchElementException()).also {
+            _size -= 1
+            if (bucket.isEmpty()) {
+                spare = bucket
+                store[index] = null
             }
-            previous = entry
-            entry = entry.after
         }
-        throw NoSuchElementException()
-    }
-
-    @Suppress("UNCHECKED_CAST")
-    fun removeEntry(entry: Entry<T>): T? {
-        var current = store[entry.index]
-        var previous: Entry<T>? = null
-        while (current != null) {
-            if (current === entry) {
-                return removeAssociation(current, previous) as T
-            }
-            previous = current
-            current = current.after
-        }
-        return null
     }
 
     open fun addAssociation(
-        index: Int,
+        bucket: FastBucket<Entry<T>>,
         hashCode: Int,
         key: String,
         value: T
-    ): Entry<T> = createEntry(index, hashCode, key, value).also {
-        store[index] = it
+    ): Entry<T> = createEntry(hashCode, key, value).also {
+        bucket.add(it)
         _size += 1
     }
 
     open fun createEntry(
-        index: Int,
         hashCode: Int,
         key: String,
         value: T
-    ): Entry<T> = Entry(index, hashCode, key, value, store[index])
+    ): Entry<T> = Entry(hashCode, key, value)
 
     @Suppress("NOTHING_TO_INLINE")
     @PublishedApi
-    internal inline fun entryMatching(index: Int, hashCode: Int, key: String): Entry<T>? {
-        var entry = store[index]
-        while (entry != null) {
-            if (entry.hashCode == hashCode && entry.key == key) {
-                return entry
-            }
-            entry = entry.after
-        }
-        return null
-    }
-
-    private fun removeAssociation(
-        entry: Entry<T>,
-        previousEntry: Entry<T>?
-    ): Entry<T> {
-        if (previousEntry == null) {
-            store[entry.index] = entry.after
-        } else {
-            previousEntry.after = entry.after
-        }
-        _size -= 1
-        return entry
-    }
+    internal inline fun entryMatching(
+        index: Int,
+        hashCode: Int,
+        key: String
+    ): Entry<T>? = store[index]?.firstOrNull(hashCode, key)
 
     fun hash(key: String): Int = key.hashCode()
 
     fun hashIndex(hashCode: Int): Int = hashCode and hashLimit
 
+    @Suppress("NOTHING_TO_INLINE")
+    @PublishedApi
+    internal inline fun FastBucket<Entry<T>>.firstOrNull(
+        hashCode: Int,
+        key: String
+    ) = firstOrNull {
+        this.hashCode == hashCode && this.key == key
+    }
+
     open class Entry<T>(
-        @JvmField
-        var index: Int,
         @JvmField
         var hashCode: Int,
         @JvmField
         var key: String,
         @JvmField
-        var value: T?,
-        @JvmField
-        var after: Entry<T>?
-    ) {
-        fun reset(): T? = value.also { _ ->
-            key = ""
-            value = null
-            after = null
-        }
-    }
+        var value: T?
+    )
 }

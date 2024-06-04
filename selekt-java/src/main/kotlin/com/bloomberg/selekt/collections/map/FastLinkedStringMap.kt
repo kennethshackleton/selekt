@@ -38,7 +38,7 @@ class FastLinkedStringMap<T>(
             if (size >= maxSize) {
                 spare = removeLastEntry()
             }
-            addAssociation(index, hashCode, key, supplier())
+            addAssociation(bucketAt(index), hashCode, key, supplier())
         }).value!!
     }
 
@@ -80,25 +80,28 @@ class FastLinkedStringMap<T>(
     }
 
     override fun addAssociation(
-        index: Int,
+        bucket: FastBucket<Entry<T>>,
         hashCode: Int,
         key: String,
         value: T
-    ): Entry<T> = (super.addAssociation(index, hashCode, key, value) as LinkedEntry<T>).also {
+    ): Entry<T> = (super.addAssociation(bucket, hashCode, key, value) as LinkedEntry<T>).also {
         putFirst(it)
     }
 
     override fun createEntry(
-        index: Int,
         hashCode: Int,
         key: String,
         value: T
     ): Entry<T> {
         spare?.let {
             spare = null
-            return it.update(index, hashCode, key, value, store[index])
+            return it.update(hashCode, key, value)
         }
-        return LinkedEntry(index, hashCode, key, value, store[index])
+        return LinkedEntry(hashCode, key, value)
+    }
+
+    override fun removeEntry(key: String): Entry<T> = super.removeEntry(key).also {
+        disposal(it.value!!)
     }
 
     @PublishedApi
@@ -113,12 +116,10 @@ class FastLinkedStringMap<T>(
 
     @PublishedApi
     internal class LinkedEntry<T>(
-        index: Int,
         hashCode: Int,
         key: String,
-        value: T,
-        after: Entry<T>?
-    ) : Entry<T>(index, hashCode, key, value, after) {
+        value: T
+    ) : Entry<T>(hashCode, key, value) {
         @JvmField
         var previous: LinkedEntry<T>? = null
         @JvmField
@@ -126,17 +127,13 @@ class FastLinkedStringMap<T>(
 
         @Suppress("NOTHING_TO_INLINE")
         inline fun update(
-            index: Int,
             hashCode: Int,
             key: String,
-            value: T,
-            after: Entry<T>?
+            value: T
         ) = apply {
-            this.index = index
             this.hashCode = hashCode
             this.key = key
             this.value = value
-            this.after = after
         }
     }
 }

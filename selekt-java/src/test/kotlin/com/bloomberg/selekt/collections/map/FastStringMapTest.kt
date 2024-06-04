@@ -22,10 +22,10 @@ import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
+import org.mockito.kotlin.verifyNoMoreInteractions
 import org.mockito.kotlin.whenever
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.test.fail
@@ -62,6 +62,7 @@ internal class FastStringMapTest {
         val item = map.getEntryElsePut("1", supplier)
         verify(supplier, times(1)).invoke()
         assertSame(item, map.getEntryElsePut("1", supplier))
+        verifyNoMoreInteractions(supplier)
     }
 
     @Test
