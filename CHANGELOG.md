@@ -1,6 +1,22 @@
 Change Log
 ==========
 
+## Version 0.22.2
+
+### Dependencies
+
+* Android Gradle Plugin 8.5.2.
+* Gradle 8.10.
+* Kotlin 1.9.24.
+* NDK 27.
+
+## Version 0.22.1
+
+### Dependencies
+
+* Android Gradle Plugin 8.3.2.
+* Gradle 8.7.
+
 ## Version 0.22.0
 
 Warning: This release decouples the choice of SQLite implementation from the main Android artifact, and requires an additional dependency declaration. Please refer to the [getting started](https://bloomberg.github.io/selekt/getting_started/#integration) guide.

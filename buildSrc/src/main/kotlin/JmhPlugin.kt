@@ -19,6 +19,7 @@ import org.gradle.api.Project
 import org.gradle.api.tasks.JavaExec
 import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.kotlin.dsl.get
+import org.gradle.kotlin.dsl.register
 
 class JmhPlugin : Plugin<Project> {
     override fun apply(target: Project): Unit = target.run {
@@ -31,24 +32,27 @@ class JmhPlugin : Plugin<Project> {
                 add(name, project)
                 add(name, "org.openjdk.jmh:jmh-core:${Versions.JMH}")
             }
-            configurations.getByName("kaptJmh") {
+            configurations.getByName("kspJmh") {
                 add(name, "org.openjdk.jmh:jmh-generator-annprocess:${Versions.JMH}")
             }
         }
-        tasks.register("jmh", JavaExec::class.java) {
-            val reportDir = "$buildDir/reports/jmh"
-            val reportFile = "$reportDir/jmh.json"
+        tasks.register<JavaExec>("jmh") {
+            val reportDir = layout.buildDirectory.dir("reports/jmh")
+            val reportFile = layout.buildDirectory.file("reports/jmh/jmh.json")
             group = "benchmark"
             dependsOn("jmhClasses")
             mainClass.set("org.openjdk.jmh.Main")
             args(
-                "-rf", "json",
-                "-rff", reportFile
+                listOfNotNull(
+                    properties["jmh.include"]?.toString(),
+                    "-rf", "json",
+                    "-rff", reportFile.get().asFile.absolutePath
+                )
             )
             classpath(sourceSets.getByName("jmh").runtimeClasspath)
-            doFirst { mkdir(reportDir) }
+            doFirst { reportDir.get().asFile.mkdir() }
             outputs.apply {
-                file(reportFile)
+                file(reportFile.get().asFile)
                 upToDateWhen { false }
             }
         }

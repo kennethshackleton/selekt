@@ -1,3 +1,6 @@
+import com.android.build.gradle.internal.lint.AndroidLintAnalysisTask
+import com.android.build.gradle.internal.lint.LintModelWriterTask
+
 /*
  * Copyright 2020 Bloomberg Finance L.P.
  *
@@ -17,14 +20,14 @@
 plugins {
     id("com.android.library")
     id("kotlin-android")
-    id("org.jetbrains.dokka")
-    id("app.cash.licensee") version Versions.GRADLE_LICENSEE_PLUGIN.version
-    kotlin("kapt")
+    alias(libs.plugins.dokka)
+    alias(libs.plugins.cash.licensee)
+    alias(libs.plugins.ksp)
     `maven-publish`
     signing
-    id("org.jetbrains.kotlinx.kover")
-    id("io.gitlab.arturbosch.detekt")
-    id("org.jlleitschuh.gradle.ktlint")
+    alias(libs.plugins.kover)
+    alias(libs.plugins.detekt)
+    alias(libs.plugins.ktlint)
 }
 
 repositories {
@@ -34,8 +37,7 @@ repositories {
 
 android {
     compileSdk = Versions.ANDROID_SDK.version.toInt()
-    @Suppress("UnstableApiUsage")
-    buildToolsVersion = Versions.ANDROID_BUILD_TOOLS.version
+    buildToolsVersion = "34.0.0"
     namespace = "com.bloomberg.selekt.android"
     defaultConfig {
         minSdk = 21
@@ -59,16 +61,16 @@ android {
 dependencies {
     api(projects.selektApi)
     compileOnly(projects.selektAndroidSqlcipher)
-    compileOnly(androidX("room", "runtime", Versions.ANDROIDX_ROOM.version))
+    compileOnly(libs.androidx.room.runtime)
     implementation(projects.selektJava)
     implementation(projects.selektSqlite3Classes)
-    kaptTest(androidX("room", "compiler", Versions.ANDROIDX_ROOM.version))
-    testImplementation(androidX("lifecycle", "livedata-ktx", Versions.ANDROIDX_LIVE_DATA.version))
-    testImplementation(androidX("room", "runtime", Versions.ANDROIDX_ROOM.version))
-    testImplementation(androidX("room", "ktx", Versions.ANDROIDX_ROOM.version))
-    testImplementation("org.junit.jupiter:junit-jupiter-params:${Versions.JUNIT5}")
+    kspTest(libs.androidx.room.compiler)
+    testImplementation(libs.androidx.lifecycle.livedata.ktx)
+    testImplementation(libs.androidx.room.runtime)
+    testImplementation(libs.androidx.room.ktx)
+    testImplementation(libs.junit.jupiter.params)
     testRuntimeOnly(projects.selektAndroidSqlcipher)
-    testRuntimeOnly("org.robolectric:android-all:${Versions.ROBOLECTRIC_ANDROID_ALL}")
+    testRuntimeOnly(libs.robolectric.android.all)
 }
 
 koverReport {
@@ -106,6 +108,14 @@ arrayOf("Debug", "Release").map { "pre${it}UnitTestBuild" }.forEach {
             dependsOn("buildNativeHost")
         }
     }
+}
+
+tasks.withType<AndroidLintAnalysisTask>().configureEach {
+    dependsOn("copyJniLibs")
+}
+
+tasks.withType<LintModelWriterTask>().configureEach {
+    dependsOn("copyJniLibs")
 }
 
 arrayOf("Debug", "Release").map { "merge${it}UnitTestAssets" }.forEach {

@@ -18,16 +18,18 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 repositories {
     mavenCentral()
+    google()
 }
 
 plugins {
     kotlin("jvm")
-    id("org.jetbrains.dokka")
+    id("com.android.lint")
+    alias(libs.plugins.dokka)
     `maven-publish`
     signing
-    id("org.jetbrains.kotlinx.kover")
-    id("io.gitlab.arturbosch.detekt")
-    id("org.jlleitschuh.gradle.ktlint")
+    alias(libs.plugins.detekt)
+    alias(libs.plugins.kover)
+    alias(libs.plugins.ktlint)
 }
 
 java {
