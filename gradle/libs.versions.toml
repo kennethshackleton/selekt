@@ -31,7 +31,7 @@ kotlin-bom = { group = "org.jetbrains.kotlin", name = "kotlin-bom", version = "2
 kotlin-reflect = { group = "org.jetbrains.kotlin", name = "kotlin-reflect" }
 kotlin-test = { group = "org.jetbrains.kotlin", name = "kotlin-test" }
 kotlin-test-junit = { group = "org.jetbrains.kotlin", name = "kotlin-test-junit" }
-kotlinx-coroutines-bom = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-bom", version = "1.8.1" }
+kotlinx-coroutines-bom = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-bom", version = "1.10.2" }
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core" }
 mockito-core = { group = "org.mockito", name = "mockito-core", version = "5.11.0" }
 mockito-kotlin = { group = "org.mockito.kotlin", name = "mockito-kotlin", version = "5.3.1" }
