@@ -59,12 +59,12 @@ val Project.sqlcipherVersionName: String
 
 fun Project.disableKotlinCompilerAssertions() {
     tasks.withType<KotlinCompile>().configureEach {
-        kotlinOptions {
-            freeCompilerArgs = listOf(
+        compilerOptions {
+            freeCompilerArgs.set(listOf(
                 "-Xno-call-assertions",
                 "-Xno-receiver-assertions",
                 "-Xno-param-assertions"
-            )
+            ))
         }
     }
 }

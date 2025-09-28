@@ -38,8 +38,8 @@ java {
 }
 
 tasks.withType<KotlinCompile>().configureEach {
-    kotlinOptions {
-        freeCompilerArgs = freeCompilerArgs + listOf(
+    compilerOptions {
+        freeCompilerArgs = freeCompilerArgs.get() + listOf(
             "-Xinline-classes",
             "-opt-in=kotlin.RequiresOptIn"
         )
