@@ -47,6 +47,7 @@ internal enum class SQLStatementType(
 }
 
 private const val SUFFICIENT_SQL_PREFIX_LENGTH = 3
+private const val ONLY_BATCH_UPDATES = "Only batched updates are permitted."
 
 @JvmSynthetic
 @Suppress("Detekt.CognitiveComplexMethod", "Detekt.ComplexCondition", "Detekt.MagicNumber", "Detekt.NestedBlockDepth")
@@ -97,6 +98,7 @@ internal fun String.resolvedSqlStatementType(): SQLStatementType = trimStartByIn
     }
 }
 
+@Suppress("Detekt.MethodOverloading")
 @ThreadSafe
 internal class SQLStatement private constructor(
     private val session: ThreadLocalSession,
@@ -105,6 +107,9 @@ internal class SQLStatement private constructor(
     private val args: Array<Any?>,
     private val asWrite: Boolean
 ) : ISQLStatement {
+    private val namedParameters: Map<String, Int> by lazy { parseNamedParameters(sql) }
+
+    @Suppress("Detekt.TooManyFunctions")
     companion object {
         fun execute(
             session: ThreadLocalSession,
@@ -120,11 +125,33 @@ internal class SQLStatement private constructor(
             sql: String,
             bindArgs: Sequence<Array<out Any?>>
         ): Int {
-            require(SQLStatementType.UPDATE === sql.resolvedSqlStatementType()) {
-                "Only batched updates are permitted."
-            }
+            require(SQLStatementType.UPDATE === sql.resolvedSqlStatementType()) { ONLY_BATCH_UPDATES }
             return session.get().execute(true, sql) {
                 it.executeBatchForChangedRowCount(sql, bindArgs)
+            }
+        }
+
+        fun execute(
+            session: ThreadLocalSession,
+            sql: String,
+            bindArgs: List<Array<out Any?>>
+        ): Int {
+            require(SQLStatementType.UPDATE === sql.resolvedSqlStatementType()) { ONLY_BATCH_UPDATES }
+            return session.get().execute(true, sql) {
+                it.executeBatchForChangedRowCount(sql, bindArgs)
+            }
+        }
+
+        fun execute(
+            session: ThreadLocalSession,
+            sql: String,
+            bindArgs: Array<out Array<out Any?>>,
+            fromIndex: Int = 0,
+            toIndex: Int = bindArgs.size
+        ): Int {
+            require(SQLStatementType.UPDATE === sql.resolvedSqlStatementType()) { ONLY_BATCH_UPDATES }
+            return session.get().execute(true, sql) {
+                it.executeBatchForChangedRowCount(sql, bindArgs, fromIndex, toIndex)
             }
         }
 
@@ -199,24 +226,48 @@ internal class SQLStatement private constructor(
         bind(index, value)
     }
 
+    override fun bindBlob(name: String, value: ByteArray) {
+        bind(resolveParameterIndex(name), value)
+    }
+
     override fun bindDouble(index: Int, value: Double) {
         bind(index, value)
+    }
+
+    override fun bindDouble(name: String, value: Double) {
+        bind(resolveParameterIndex(name), value)
     }
 
     override fun bindInt(index: Int, value: Int) {
         bind(index, value)
     }
 
+    override fun bindInt(name: String, value: Int) {
+        bind(resolveParameterIndex(name), value)
+    }
+
     override fun bindLong(index: Int, value: Long) {
         bind(index, value)
+    }
+
+    override fun bindLong(name: String, value: Long) {
+        bind(resolveParameterIndex(name), value)
     }
 
     override fun bindNull(index: Int) {
         bind(index, null)
     }
 
+    override fun bindNull(name: String) {
+        bind(resolveParameterIndex(name), null)
+    }
+
     override fun bindString(index: Int, value: String) {
         bind(index, value)
+    }
+
+    override fun bindString(name: String, value: String) {
+        bind(resolveParameterIndex(name), value)
     }
 
     override fun clearBindings() {
@@ -250,6 +301,11 @@ internal class SQLStatement private constructor(
     private fun bind(index: Int, value: Any?) {
         args[index - 1] = value
     }
+
+    private fun resolveParameterIndex(name: String): Int =
+        namedParameters[name] ?: throw IllegalArgumentException(
+            "Named parameter '$name' not found in SQL. Available parameters: ${namedParameters.keys}"
+        )
 }
 
 @Suppress("UseDataClass")

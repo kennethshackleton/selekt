@@ -27,7 +27,6 @@ plugins {
     `maven-publish`
     signing
     alias(libs.plugins.detekt)
-    alias(libs.plugins.ktlint)
 }
 
 repositories {
@@ -43,7 +42,7 @@ android {
     namespace = "com.bloomberg.selekt.android.sqlcipher"
     ndkVersion = "27.3.13750724"
     defaultConfig {
-        minSdk = 21
+        minSdk = 24
         @Suppress("UnstableApiUsage")
         externalNativeBuild {
             cmake {

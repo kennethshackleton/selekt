@@ -68,6 +68,19 @@ class SQLDatabase(
         SQLStatement.execute(session, sql, bindArgs)
     }
 
+    fun batch(sql: String, bindArgs: List<Array<out Any?>>): Int = transact {
+        SQLStatement.execute(session, sql, bindArgs)
+    }
+
+    fun batch(
+        sql: String,
+        bindArgs: Array<out Array<out Any?>>,
+        fromIndex: Int = 0,
+        toIndex: Int = bindArgs.size
+    ): Int = transact {
+        SQLStatement.execute(session, sql, bindArgs, fromIndex, toIndex)
+    }
+
     fun batch(sql: String, bindArgs: Iterable<Array<out Any?>>): Int = transact {
         SQLStatement.execute(session, sql, bindArgs)
     }

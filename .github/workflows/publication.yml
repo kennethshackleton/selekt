@@ -210,7 +210,7 @@ jobs:
           echo "org.gradle.java.home=${JAVA_HOME}" >> gradle.properties
 
       - name: 'Unit tests'
-        run: ./gradlew :selekt-android:testDebugUnitTest :selekt-java:test :selekt-sqlite3-classes:testJava17 :selekt-sqlite3-classes:testJava25 :selekt-common:test -x integrationTest ${{ env.SCAN }}
+        run: ./gradlew :selekt-android:testDebugUnitTest :selekt-java:test :selekt-jdbc:test :selekt-sqlite3-classes:testJava17 :selekt-sqlite3-classes:testJava25 :selekt-common:test -x integrationTest ${{ env.SCAN }}
 
       - name: 'Build Selekt Android'
         run: |
@@ -224,7 +224,7 @@ jobs:
 
       - name: 'Build Selekt JVM'
         run: |
-          ./gradlew :selekt-jvm:jar ${{ env.SCAN }}
+          ./gradlew :selekt-jdbc:jar :selekt-jvm:jar ${{ env.SCAN }}
 
       - name: 'Publish release to OSSRH'
         if: github.event_name == 'release' && github.event.action == 'published'

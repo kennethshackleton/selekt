@@ -111,6 +111,38 @@ internal class SQLConnection(
         sqlite.totalChanges(pointer) - changes
     }
 
+    override fun executeBatchForChangedRowCount(
+        sql: String,
+        bindArgs: List<Array<out Any?>>
+    ) = withPreparedStatement(sql) {
+        val changes = sqlite.totalChanges(pointer)
+        for (i in bindArgs.indices) {
+            reset()
+            bindArguments(bindArgs[i])
+            if (SQL_DONE != step()) {
+                return@withPreparedStatement -1
+            }
+        }
+        sqlite.totalChanges(pointer) - changes
+    }
+
+    override fun executeBatchForChangedRowCount(
+        sql: String,
+        bindArgs: Array<out Array<out Any?>>,
+        fromIndex: Int,
+        toIndex: Int
+    ) = withPreparedStatement(sql) {
+        val changes = sqlite.totalChanges(pointer)
+        for (i in fromIndex until toIndex) {
+            reset()
+            bindArguments(bindArgs[i])
+            if (SQL_DONE != step()) {
+                return@withPreparedStatement -1
+            }
+        }
+        sqlite.totalChanges(pointer) - changes
+    }
+
     override fun executeForCursorWindow(
         sql: String,
         bindArgs: Array<out Any?>,

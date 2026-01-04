@@ -20,10 +20,19 @@ import java.util.stream.Stream
 import kotlin.streams.asSequence
 
 internal interface BatchSQLExecutor {
-    fun executeBatchForChangedRowCount(sql: String, bindArgs: Sequence<Array<out Any?>>): Int
-
     fun executeBatchForChangedRowCount(sql: String, bindArgs: Iterable<Array<out Any?>>): Int =
         executeBatchForChangedRowCount(sql, bindArgs.asSequence())
+
+    fun executeBatchForChangedRowCount(sql: String, bindArgs: List<Array<out Any?>>): Int
+
+    fun executeBatchForChangedRowCount(sql: String, bindArgs: Sequence<Array<out Any?>>): Int
+
+    fun executeBatchForChangedRowCount(
+        sql: String,
+        bindArgs: Array<out Array<out Any?>>,
+        fromIndex: Int = 0,
+        toIndex: Int = bindArgs.size
+    ): Int
 
     fun executeBatchForChangedRowCount(sql: String, bindArgs: Stream<Array<out Any?>>): Int =
         executeBatchForChangedRowCount(sql, bindArgs.asSequence())

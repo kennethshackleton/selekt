@@ -18,7 +18,6 @@ plugins {
     id("com.android.application")
     id("kotlin-android")
     alias(libs.plugins.detekt)
-    alias(libs.plugins.ktlint)
 }
 
 repositories {
@@ -31,7 +30,7 @@ android {
     namespace = "com.bloomberg.selekt.cli"
     defaultConfig {
         applicationId = "com.bloomberg.selekt.cli"
-        minSdk = 21
+        minSdk = 24
         targetSdk = 34
         versionCode = 1
         versionName = "0.1"

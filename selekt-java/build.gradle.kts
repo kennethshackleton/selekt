@@ -29,7 +29,6 @@ plugins {
     signing
     alias(libs.plugins.jmh)
     alias(libs.plugins.detekt)
-    alias(libs.plugins.ktlint)
 }
 
 repositories {
@@ -76,6 +75,8 @@ dependencies {
             requireCapability("com.bloomberg.selekt:selekt-sqlite3-classes-java17")
         }
     }
+    jmhImplementation(projects.selektJdbc)
+    jmhImplementation(projects.selektSqlite3Sqlcipher)
     jmhImplementation(libs.kotlinx.coroutines.core)
     jmhImplementation(libs.xerial.sqlite.jdbc)
 }

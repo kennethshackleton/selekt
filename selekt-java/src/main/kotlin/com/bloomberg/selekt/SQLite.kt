@@ -49,6 +49,8 @@ open class SQLite(
 
     fun bindParameterCount(statement: Long) = sqlite.bindParameterCount(statement)
 
+    fun bindParameterIndex(statement: Long, name: String) = sqlite.bindParameterIndex(statement, name)
+
     fun bindText(statement: Long, index: Int, value: String) = checkBindSQLCode(
         statement,
         sqlite.bindText(statement, index, value)

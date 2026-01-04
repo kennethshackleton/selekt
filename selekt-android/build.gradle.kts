@@ -29,7 +29,6 @@ plugins {
     signing
     alias(libs.plugins.kover)
     alias(libs.plugins.detekt)
-    alias(libs.plugins.ktlint)
 }
 
 repositories {
@@ -41,7 +40,7 @@ android {
     compileSdk = Versions.ANDROID_SDK.version.toInt()
     namespace = "com.bloomberg.selekt.android"
     defaultConfig {
-        minSdk = 21
+        minSdk = 24
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildTypes {
