@@ -43,8 +43,11 @@ import kotlin.test.assertTrue
 internal class SQLiteDatabaseWALTest {
     private val file = createTempFile("test-sql-database-wal", ".db").toFile().apply { deleteOnExit() }
 
-    private val database = SQLiteDatabase.openOrCreateDatabase(file, SQLiteJournalMode.WAL.databaseConfiguration,
-        ByteArray(32) { 0x42 })
+    private val database = SQLiteDatabase.openOrCreateDatabase(
+        file,
+        SQLiteJournalMode.WAL.databaseConfiguration,
+        ByteArray(32) { 0x42 }
+    )
 
     @BeforeEach
     fun setUp() {

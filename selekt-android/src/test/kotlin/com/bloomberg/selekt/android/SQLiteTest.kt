@@ -1146,6 +1146,7 @@ internal class SQLiteTest {
             }
         }
     }
+
     @Test
     fun blobReadOnReadOnlyConnection(): Unit = SQLite.run {
         exec(db, "CREATE TABLE 'Foo' (bar BLOB)")

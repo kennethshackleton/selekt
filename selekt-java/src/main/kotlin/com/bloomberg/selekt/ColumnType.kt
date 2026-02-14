@@ -24,7 +24,7 @@ enum class ColumnType(val sqlDataType: SQLDataType) {
     NULL(SQL_NULL);
 
     companion object {
-        fun toColumnType(sqlDataType: SQLDataType) = values()[sqlDataType - 1]
+        fun toColumnType(sqlDataType: SQLDataType) = entries[sqlDataType - 1]
     }
 }
 
