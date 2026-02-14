@@ -401,7 +401,7 @@ internal class SingleObjectPoolTest {
     }
 
     @Test
-    fun interruptBorrowerdoReturn(): Unit = pool.run {
+    fun interruptBorrowerThenReturn(): Unit = pool.run {
         borrowObject().let {
             Thread.interrupted()
             assertDoesNotThrow {
