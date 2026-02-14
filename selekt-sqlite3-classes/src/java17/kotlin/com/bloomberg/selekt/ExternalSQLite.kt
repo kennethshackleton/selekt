@@ -59,6 +59,8 @@ internal class ExternalSQLite(
 
     external override fun bindParameterCount(statement: Long): Int
 
+    external override fun bindParameterIndex(statement: Long, name: String): Int
+
     external override fun bindText(statement: Long, index: Int, value: String): SQLCode
 
     external override fun bindZeroBlob(statement: Long, index: Int, length: Int): SQLCode

@@ -32,6 +32,8 @@ internal class SQLQuery internal constructor(
     private val statementType: SQLStatementType,
     private val bindArgs: Array<Any?>
 ) : IQuery {
+    private val namedParameters: Map<String, Int> by lazy { parseNamedParameters(sql) }
+
     companion object {
         fun create(
             session: ThreadLocalSession,
@@ -51,15 +53,29 @@ internal class SQLQuery internal constructor(
 
     override fun bindBlob(index: Int, value: ByteArray) = bind(index, value)
 
+    override fun bindBlob(name: String, value: ByteArray) {
+        bind(resolveParameterIndex(name), value)
+    }
+
     override fun bindDouble(index: Int, value: Double) = bind(index, value)
+
+    override fun bindDouble(name: String, value: Double) = bind(resolveParameterIndex(name), value)
 
     override fun bindInt(index: Int, value: Int) = bind(index, value)
 
+    override fun bindInt(name: String, value: Int) = bind(resolveParameterIndex(name), value)
+
     override fun bindLong(index: Int, value: Long) = bind(index, value)
+
+    override fun bindLong(name: String, value: Long) = bind(resolveParameterIndex(name), value)
 
     override fun bindNull(index: Int) = bind(index, null)
 
+    override fun bindNull(name: String) = bind(resolveParameterIndex(name), null)
+
     override fun bindString(index: Int, value: String) = bind(index, value)
+
+    override fun bindString(name: String, value: String) = bind(resolveParameterIndex(name), value)
 
     override fun clearBindings() {
         bindArgs.fill(null)
@@ -101,6 +117,10 @@ internal class SQLQuery internal constructor(
     private fun bind(index: Int, arg: Any?) {
         bindArgs[index - 1] = arg
     }
+
+    private fun resolveParameterIndex(name: String): Int = namedParameters[name] ?: throw IllegalArgumentException(
+        "Named parameter '$name' not found in SQL. Available parameters: ${namedParameters.keys}"
+    )
 }
 
 class SimpleSQLQuery(

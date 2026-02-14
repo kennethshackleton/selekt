@@ -122,6 +122,16 @@ internal class ExternalSQLite(
         statement: Long
     ): Int = sqlite3_bind_parameter_count.invoke(MemorySegment.ofAddress(statement)) as Int
 
+    override fun bindParameterIndex(
+        statement: Long,
+        name: String
+    ): Int = Arena.ofConfined().use {
+        sqlite3_bind_parameter_index.invoke(
+            MemorySegment.ofAddress(statement),
+            it.allocateFrom(name)
+        ) as Int
+    }
+
     override fun bindText(
         statement: Long,
         index: Int,
@@ -616,12 +626,16 @@ internal class ExternalSQLite(
 
         private val sqliteTransient = MemorySegment.ofAddress(-1L)
 
+        private val criticalOption = Linker.Option.critical(true)
+        private val nonCriticalOption = Linker.Option.critical(false)
+
         private val sqlite3_bind_blob: MethodHandle
         private val sqlite3_bind_double: MethodHandle
         private val sqlite3_bind_int: MethodHandle
         private val sqlite3_bind_int64: MethodHandle
         private val sqlite3_bind_null: MethodHandle
         private val sqlite3_bind_parameter_count: MethodHandle
+        private val sqlite3_bind_parameter_index: MethodHandle
         private val sqlite3_bind_text: MethodHandle
         private val sqlite3_bind_zeroblob: MethodHandle
         private val sqlite3_blob_bytes: MethodHandle
@@ -687,267 +701,338 @@ internal class ExternalSQLite(
             loadLibrary(checkNotNull(ExternalSQLite::class.java.classLoader), "jni", "selekt")
             sqlite3_bind_blob = linker.downcallHandle(
                 symbolLookup.find("sqlite3_bind_blob").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT, ADDRESS, JAVA_INT, ADDRESS)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT, ADDRESS, JAVA_INT, ADDRESS),
+                criticalOption
             )
             sqlite3_bind_double = linker.downcallHandle(
                 symbolLookup.find("sqlite3_bind_double").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT, JAVA_DOUBLE)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT, JAVA_DOUBLE),
+                criticalOption
             )
             sqlite3_bind_int = linker.downcallHandle(
                 symbolLookup.find("sqlite3_bind_int").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT, JAVA_INT)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT, JAVA_INT),
+                criticalOption
             )
             sqlite3_bind_int64 = linker.downcallHandle(
                 symbolLookup.find("sqlite3_bind_int64").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT, JAVA_LONG)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT, JAVA_LONG),
+                criticalOption
             )
             sqlite3_bind_null = linker.downcallHandle(
                 symbolLookup.find("sqlite3_bind_null").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT),
+                criticalOption
             )
             sqlite3_bind_parameter_count = linker.downcallHandle(
                 symbolLookup.find("sqlite3_bind_parameter_count").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS),
+                criticalOption
+            )
+            sqlite3_bind_parameter_index = linker.downcallHandle(
+                symbolLookup.find("sqlite3_bind_parameter_index").orElseThrow(),
+                FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS),
+                criticalOption
             )
             sqlite3_bind_text = linker.downcallHandle(
                 symbolLookup.find("sqlite3_bind_text").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT, ADDRESS, JAVA_INT, ADDRESS)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT, ADDRESS, JAVA_INT, ADDRESS),
+                criticalOption
             )
             sqlite3_bind_zeroblob = linker.downcallHandle(
                 symbolLookup.find("sqlite3_bind_zeroblob").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT, JAVA_INT)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT, JAVA_INT),
+                criticalOption
             )
             sqlite3_blob_bytes = linker.downcallHandle(
                 symbolLookup.find("sqlite3_blob_bytes").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS),
+                criticalOption
             )
             sqlite3_blob_close = linker.downcallHandle(
                 symbolLookup.find("sqlite3_blob_close").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS),
+                criticalOption
             )
             sqlite3_blob_open = linker.downcallHandle(
                 symbolLookup.find("sqlite3_blob_open").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, ADDRESS, ADDRESS, JAVA_LONG, JAVA_INT, ADDRESS)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, ADDRESS, ADDRESS, JAVA_LONG, JAVA_INT, ADDRESS),
+                nonCriticalOption
             )
             sqlite3_blob_read = linker.downcallHandle(
                 symbolLookup.find("sqlite3_blob_read").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_INT, JAVA_INT)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_INT, JAVA_INT),
+                nonCriticalOption
             )
             sqlite3_blob_reopen = linker.downcallHandle(
                 symbolLookup.find("sqlite3_blob_reopen").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_LONG)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_LONG),
+                criticalOption
             )
             sqlite3_blob_write = linker.downcallHandle(
                 symbolLookup.find("sqlite3_blob_write").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_INT, JAVA_INT)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_INT, JAVA_INT),
+                nonCriticalOption
             )
             sqlite3_busy_timeout = linker.downcallHandle(
                 symbolLookup.find("sqlite3_busy_timeout").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT),
+                criticalOption
             )
             sqlite3_changes = linker.downcallHandle(
                 symbolLookup.find("sqlite3_changes").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS),
+                criticalOption
             )
             sqlite3_clear_bindings = linker.downcallHandle(
                 symbolLookup.find("sqlite3_clear_bindings").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS),
+                criticalOption
             )
             sqlite3_close_v2 = linker.downcallHandle(
                 symbolLookup.find("sqlite3_close_v2").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS),
+                nonCriticalOption
             )
             sqlite3_column_blob = linker.downcallHandle(
                 symbolLookup.find("sqlite3_column_blob").orElseThrow(),
-                FunctionDescriptor.of(ADDRESS, ADDRESS, JAVA_INT)
+                FunctionDescriptor.of(ADDRESS, ADDRESS, JAVA_INT),
+                criticalOption
             )
             sqlite3_column_bytes = linker.downcallHandle(
                 symbolLookup.find("sqlite3_column_bytes").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT),
+                criticalOption
             )
             sqlite3_column_count = linker.downcallHandle(
                 symbolLookup.find("sqlite3_column_count").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS),
+                criticalOption
             )
             sqlite3_column_double = linker.downcallHandle(
                 symbolLookup.find("sqlite3_column_double").orElseThrow(),
-                FunctionDescriptor.of(JAVA_DOUBLE, ADDRESS, JAVA_INT)
+                FunctionDescriptor.of(JAVA_DOUBLE, ADDRESS, JAVA_INT),
+                criticalOption
             )
             sqlite3_column_int = linker.downcallHandle(
                 symbolLookup.find("sqlite3_column_int").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT),
+                criticalOption
             )
             sqlite3_column_int64 = linker.downcallHandle(
                 symbolLookup.find("sqlite3_column_int64").orElseThrow(),
-                FunctionDescriptor.of(JAVA_LONG, ADDRESS, JAVA_INT)
+                FunctionDescriptor.of(JAVA_LONG, ADDRESS, JAVA_INT),
+                criticalOption
             )
             sqlite3_column_name = linker.downcallHandle(
                 symbolLookup.find("sqlite3_column_name").orElseThrow(),
-                FunctionDescriptor.of(ADDRESS, ADDRESS, JAVA_INT)
+                FunctionDescriptor.of(ADDRESS, ADDRESS, JAVA_INT),
+                criticalOption
             )
             sqlite3_column_text = linker.downcallHandle(
                 symbolLookup.find("sqlite3_column_text").orElseThrow(),
-                FunctionDescriptor.of(ADDRESS, ADDRESS, JAVA_INT)
+                FunctionDescriptor.of(ADDRESS, ADDRESS, JAVA_INT),
+                criticalOption
             )
             sqlite3_column_type = linker.downcallHandle(
                 symbolLookup.find("sqlite3_column_type").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT),
+                criticalOption
             )
             sqlite3_column_value = linker.downcallHandle(
                 symbolLookup.find("sqlite3_column_value").orElseThrow(),
-                FunctionDescriptor.of(ADDRESS, ADDRESS, JAVA_INT)
+                FunctionDescriptor.of(ADDRESS, ADDRESS, JAVA_INT),
+                criticalOption
             )
             sqlite3_db_handle = linker.downcallHandle(
                 symbolLookup.find("sqlite3_db_handle").orElseThrow(),
-                FunctionDescriptor.of(ADDRESS, ADDRESS)
+                FunctionDescriptor.of(ADDRESS, ADDRESS),
+                criticalOption
             )
             sqlite3_db_readonly = linker.downcallHandle(
                 symbolLookup.find("sqlite3_db_readonly").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS),
+                criticalOption
             )
             sqlite3_db_release_memory = linker.downcallHandle(
                 symbolLookup.find("sqlite3_db_release_memory").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS),
+                criticalOption
             )
             sqlite3_db_status = linker.downcallHandle(
                 symbolLookup.find("sqlite3_db_status").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT, ADDRESS, ADDRESS, JAVA_INT)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT, ADDRESS, ADDRESS, JAVA_INT),
+                criticalOption
             )
             sqlite3_errcode = linker.downcallHandle(
                 symbolLookup.find("sqlite3_errcode").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS),
+                criticalOption
             )
             sqlite3_errmsg = linker.downcallHandle(
                 symbolLookup.find("sqlite3_errmsg").orElseThrow(),
-                FunctionDescriptor.of(ADDRESS, ADDRESS)
+                FunctionDescriptor.of(ADDRESS, ADDRESS),
+                criticalOption
             )
             sqlite3_exec = linker.downcallHandle(
                 symbolLookup.find("sqlite3_exec").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, ADDRESS, ADDRESS, ADDRESS)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, ADDRESS, ADDRESS, ADDRESS),
+                nonCriticalOption
             )
             sqlite3_expanded_sql = linker.downcallHandle(
                 symbolLookup.find("sqlite3_expanded_sql").orElseThrow(),
-                FunctionDescriptor.of(ADDRESS, ADDRESS)
+                FunctionDescriptor.of(ADDRESS, ADDRESS),
+                criticalOption
             )
             sqlite3_extended_errcode = linker.downcallHandle(
                 symbolLookup.find("sqlite3_extended_errcode").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS),
+                criticalOption
             )
             sqlite3_extended_result_codes = linker.downcallHandle(
                 symbolLookup.find("sqlite3_extended_result_codes").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT),
+                criticalOption
             )
             sqlite3_finalize = linker.downcallHandle(
                 symbolLookup.find("sqlite3_finalize").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS),
+                criticalOption
             )
             sqlite3_get_autocommit = linker.downcallHandle(
                 symbolLookup.find("sqlite3_get_autocommit").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS),
+                criticalOption
             )
             sqlite3_hard_heap_limit64 = linker.downcallHandle(
                 symbolLookup.find("sqlite3_hard_heap_limit64").orElseThrow(),
-                FunctionDescriptor.of(JAVA_LONG, JAVA_LONG)
+                FunctionDescriptor.of(JAVA_LONG, JAVA_LONG),
+                criticalOption
             )
             sqlite3_key = linker.downcallHandle(
                 symbolLookup.find("sqlite3_key").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_INT)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_INT),
+                criticalOption
             )
             sqlite3_keyword_count = linker.downcallHandle(
                 symbolLookup.find("sqlite3_keyword_count").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT)
+                FunctionDescriptor.of(JAVA_INT),
+                criticalOption
             )
             sqlite3_last_insert_rowid = linker.downcallHandle(
                 symbolLookup.find("sqlite3_last_insert_rowid").orElseThrow(),
-                FunctionDescriptor.of(JAVA_LONG, ADDRESS)
+                FunctionDescriptor.of(JAVA_LONG, ADDRESS),
+                criticalOption
             )
             sqlite3_libversion = linker.downcallHandle(
                 symbolLookup.find("sqlite3_libversion").orElseThrow(),
-                FunctionDescriptor.of(ADDRESS)
+                FunctionDescriptor.of(ADDRESS),
+                criticalOption
             )
             sqlite3_libversion_number = linker.downcallHandle(
                 symbolLookup.find("sqlite3_libversion_number").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT)
+                FunctionDescriptor.of(JAVA_INT),
+                criticalOption
             )
             sqlite3_memory_used = linker.downcallHandle(
                 symbolLookup.find("sqlite3_memory_used").orElseThrow(),
-                FunctionDescriptor.of(JAVA_LONG)
+                FunctionDescriptor.of(JAVA_LONG),
+                criticalOption
             )
             sqlite3_open_v2 = linker.downcallHandle(
                 symbolLookup.find("sqlite3_open_v2").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_INT, ADDRESS)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_INT, ADDRESS),
+                nonCriticalOption
             )
             sqlite3_prepare_v2 = linker.downcallHandle(
                 symbolLookup.find("sqlite3_prepare_v2").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_INT, ADDRESS, ADDRESS)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_INT, ADDRESS, ADDRESS),
+                criticalOption
             )
             sqlite3_rekey = linker.downcallHandle(
                 symbolLookup.find("sqlite3_rekey").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_INT)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_INT),
+                criticalOption
             )
             sqlite3_release_memory = linker.downcallHandle(
                 symbolLookup.find("sqlite3_release_memory").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, JAVA_INT)
+                FunctionDescriptor.of(JAVA_INT, JAVA_INT),
+                criticalOption
             )
             sqlite3_reset = linker.downcallHandle(
                 symbolLookup.find("sqlite3_reset").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS),
+                criticalOption
             )
             sqlite3_sql = linker.downcallHandle(
                 symbolLookup.find("sqlite3_sql").orElseThrow(),
-                FunctionDescriptor.of(ADDRESS, ADDRESS)
+                FunctionDescriptor.of(ADDRESS, ADDRESS),
+                criticalOption
             )
             sqlite3_step = linker.downcallHandle(
                 symbolLookup.find("sqlite3_step").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS),
+                criticalOption
             )
             sqlite3_stmt_busy = linker.downcallHandle(
                 symbolLookup.find("sqlite3_stmt_busy").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS),
+                criticalOption
             )
             sqlite3_stmt_readonly = linker.downcallHandle(
                 symbolLookup.find("sqlite3_stmt_readonly").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS),
+                criticalOption
             )
             sqlite3_stmt_status = linker.downcallHandle(
                 symbolLookup.find("sqlite3_stmt_status").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT, JAVA_INT)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT, JAVA_INT),
+                criticalOption
             )
             sqlite3_threadsafe = linker.downcallHandle(
                 symbolLookup.find("sqlite3_threadsafe").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT)
+                FunctionDescriptor.of(JAVA_INT),
+                criticalOption
             )
             sqlite3_total_changes = linker.downcallHandle(
                 symbolLookup.find("sqlite3_total_changes").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS),
+                criticalOption
             )
             sqlite3_trace_v2 = linker.downcallHandle(
                 symbolLookup.find("sqlite3_trace_v2").orElseThrow(),
-                FunctionDescriptor.ofVoid(ADDRESS, JAVA_INT, ADDRESS, ADDRESS)
+                FunctionDescriptor.ofVoid(ADDRESS, JAVA_INT, ADDRESS, ADDRESS),
+                criticalOption
             )
             sqlite3_txn_state = linker.downcallHandle(
                 symbolLookup.find("sqlite3_txn_state").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS),
+                criticalOption
             )
             sqlite3_value_dup = linker.downcallHandle(
                 symbolLookup.find("sqlite3_value_dup").orElseThrow(),
-                FunctionDescriptor.of(ADDRESS, ADDRESS)
+                FunctionDescriptor.of(ADDRESS, ADDRESS),
+                criticalOption
             )
             sqlite3_value_free = linker.downcallHandle(
                 symbolLookup.find("sqlite3_value_free").orElseThrow(),
-                FunctionDescriptor.ofVoid(ADDRESS)
+                FunctionDescriptor.ofVoid(ADDRESS),
+                criticalOption
             )
             sqlite3_value_frombind = linker.downcallHandle(
                 symbolLookup.find("sqlite3_value_frombind").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS),
+                criticalOption
             )
             sqlite3_wal_autocheckpoint = linker.downcallHandle(
                 symbolLookup.find("sqlite3_wal_autocheckpoint").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT),
+                criticalOption
             )
             sqlite3_wal_checkpoint_v2 = linker.downcallHandle(
                 symbolLookup.find("sqlite3_wal_checkpoint_v2").orElseThrow(),
-                FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_INT, ADDRESS, ADDRESS)
+                FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_INT, ADDRESS, ADDRESS),
+                criticalOption
             )
         }
     }

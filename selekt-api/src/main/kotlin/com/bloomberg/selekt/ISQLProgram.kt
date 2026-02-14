@@ -18,6 +18,7 @@ package com.bloomberg.selekt
 
 import java.io.Closeable
 
+@Suppress("Detekt.ComplexInterface", "Detekt.TooManyFunctions")
 interface ISQLProgram : Closeable {
     /**
      * Bind a byte array value to this statement. The value remains bound until [clearBindings] is called.
@@ -28,12 +29,34 @@ interface ISQLProgram : Closeable {
     fun bindBlob(index: Int, value: ByteArray)
 
     /**
+     * Bind a byte array value to this statement by parameter name. The value remains bound until [clearBindings] is called.
+     *
+     * Named parameters in SQLite can use the following syntax: :name, @name, or $name.
+     *
+     * @param name The name of the parameter to bind (including the prefix character like :, @, or $).
+     * @param value The value to bind.
+     * @throws IllegalArgumentException if the parameter name is not found.
+     */
+    fun bindBlob(name: String, value: ByteArray)
+
+    /**
      * Bind a double value to this statement. The value remains bound until [clearBindings] is called.
      *
      * @param index The 1-based index to the parameter to bind.
      * @param value The value to bind.
      */
     fun bindDouble(index: Int, value: Double)
+
+    /**
+     * Bind a double value to this statement by parameter name. The value remains bound until [clearBindings] is called.
+     *
+     * Named parameters in SQLite can use the following syntax: :name, @name, or $name.
+     *
+     * @param name The name of the parameter to bind (including the prefix character like :, @, or $).
+     * @param value The value to bind.
+     * @throws IllegalArgumentException if the parameter name is not found.
+     */
+    fun bindDouble(name: String, value: Double)
 
     /**
      * Bind an integer value to this statement. The value remains bound until [clearBindings] is called.
@@ -44,12 +67,34 @@ interface ISQLProgram : Closeable {
     fun bindInt(index: Int, value: Int)
 
     /**
+     * Bind an integer value to this statement by parameter name. The value remains bound until [clearBindings] is called.
+     *
+     * Named parameters in SQLite can use the following syntax: :name, @name, or $name.
+     *
+     * @param name The name of the parameter to bind (including the prefix character like :, @, or $).
+     * @param value The value to bind.
+     * @throws IllegalArgumentException if the parameter name is not found.
+     */
+    fun bindInt(name: String, value: Int)
+
+    /**
      * Bind a long value to this statement. The value remains bound until [clearBindings] is called.
      *
      * @param index The 1-based index to the parameter to bind.
      * @param value The value to bind.
      */
     fun bindLong(index: Int, value: Long)
+
+    /**
+     * Bind a long value to this statement by parameter name. The value remains bound until [clearBindings] is called.
+     *
+     * Named parameters in SQLite can use the following syntax: :name, @name, or $name.
+     *
+     * @param name The name of the parameter to bind (including the prefix character like :, @, or $).
+     * @param value The value to bind.
+     * @throws IllegalArgumentException if the parameter name is not found.
+     */
+    fun bindLong(name: String, value: Long)
 
     /**
      * Bind a null value to this statement. The value remains bound until [clearBindings] is called.
@@ -59,12 +104,33 @@ interface ISQLProgram : Closeable {
     fun bindNull(index: Int)
 
     /**
+     * Bind a null value to this statement by parameter name. The value remains bound until [clearBindings] is called.
+     *
+     * Named parameters in SQLite can use the following syntax: :name, @name, or $name.
+     *
+     * @param name The name of the parameter to bind (including the prefix character like :, @, or $).
+     * @throws IllegalArgumentException if the parameter name is not found.
+     */
+    fun bindNull(name: String)
+
+    /**
      * Bind a String value to this statement. The value remains bound until [clearBindings] is called.
      *
      * @param index The 1-based index to the parameter to bind.
      * @param value The value to bind.
      */
     fun bindString(index: Int, value: String)
+
+    /**
+     * Bind a String value to this statement by parameter name. The value remains bound until [clearBindings] is called.
+     *
+     * Named parameters in SQLite can use the following syntax: :name, @name, or $name.
+     *
+     * @param name The name of the parameter to bind (including the prefix character like :, @, or $).
+     * @param value The value to bind.
+     * @throws IllegalArgumentException if the parameter name is not found.
+     */
+    fun bindString(name: String, value: String)
 
     /**
      * Clears all existing bindings. Unset bindings are treated as null.

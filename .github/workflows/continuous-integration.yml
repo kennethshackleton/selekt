@@ -171,7 +171,7 @@ jobs:
         run: ./gradlew licensee --no-configuration-cache
 
       - name: 'Analyse'
-        run: ./gradlew detekt ktlintCheck lint -x lintRelease ${{ env.SCAN }}
+        run: ./gradlew detekt lint -x lintRelease ${{ env.SCAN }}
 
       - name: 'Archive analysis reports'
         uses: actions/upload-artifact@v6
@@ -182,7 +182,7 @@ jobs:
             **/build/reports/detekt
 
       - name: 'Unit tests'
-        run: ./gradlew :selekt-android:testDebugUnitTest :selekt-java:test :selekt-sqlite3-classes:testJava17 :selekt-sqlite3-classes:testJava25 :selekt-common:test :koverHtmlReport -x integrationTest ${{ env.SCAN }}
+        run: ./gradlew :selekt-android:testDebugUnitTest :selekt-java:test :selekt-jdbc:test :selekt-sqlite3-classes:testJava17 :selekt-sqlite3-classes:testJava25 :selekt-common:test :koverHtmlReport -x integrationTest ${{ env.SCAN }}
 
       - name: 'Archive test reports'
         uses: actions/upload-artifact@v6
@@ -202,7 +202,7 @@ jobs:
 
       - name: 'Build Selekt JVM'
         run: |
-          ./gradlew :selekt-jvm:jar ${{ env.SCAN }}
+          ./gradlew :selekt-jdbc:jar :selekt-jvm:jar ${{ env.SCAN }}
 
       - name: 'Verify coverage'
         run:

@@ -36,6 +36,8 @@ interface IExternalSQLite {
 
     fun bindParameterCount(statement: Long): Int
 
+    fun bindParameterIndex(statement: Long, name: String): Int
+
     fun bindText(statement: Long, index: Int, value: String): SQLCode
 
     fun bindZeroBlob(statement: Long, index: Int, length: Int): SQLCode

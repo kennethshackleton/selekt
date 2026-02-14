@@ -19,7 +19,6 @@ plugins {
     id("kotlin-android")
     alias(libs.plugins.androidx.benchmark)
     alias(libs.plugins.detekt)
-    alias(libs.plugins.ktlint)
 }
 
 repositories {
@@ -31,7 +30,7 @@ android {
     compileSdkVersion(Versions.ANDROID_SDK.version.toInt())
     namespace = "com.bloomberg.selekt.android.benchmark"
     defaultConfig {
-        minSdkVersion(21)
+        minSdkVersion(24)
         targetSdkVersion(34)
         testInstrumentationRunner = "androidx.benchmark.junit4.AndroidBenchmarkRunner"
         testInstrumentationRunnerArguments.putAll(arrayOf(

@@ -28,7 +28,6 @@ plugins {
     `maven-publish`
     signing
     alias(libs.plugins.detekt)
-    alias(libs.plugins.ktlint)
 }
 
 repositories {

@@ -44,6 +44,9 @@ fun platformIdentifier() = "${osName()}-${System.getProperty("os.arch")}"
 
 tasks.named<Jar>("jar") {
     archiveClassifier.set(platformIdentifier())
+    metaInf {
+        from("$rootDir/SQLCIPHER_LICENSE")
+    }
 }
 
 tasks.withType<ProcessResources>().configureEach {

@@ -24,7 +24,7 @@ private const val NANOS_PER_MILLI = 1_000_000L
 private const val MAX_PAUSE_MILLIS = 100L
 
 @NotThreadSafe
-@Suppress("Detekt.TooManyFunctions")
+@Suppress("Detekt.MethodOverloading", "Detekt.TooManyFunctions")
 internal class SQLPreparedStatement(
     private var pointer: Pointer,
     private var rawSql: String,
@@ -73,24 +73,48 @@ internal class SQLPreparedStatement(
         sqlite.bindBlob(pointer, index, value)
     }
 
+    fun bind(name: String, value: ByteArray) {
+        sqlite.bindBlob(pointer, resolveParameterIndex(name), value)
+    }
+
     fun bind(index: Int, value: Double) {
         sqlite.bindDouble(pointer, index, value)
+    }
+
+    fun bind(name: String, value: Double) {
+        sqlite.bindDouble(pointer, resolveParameterIndex(name), value)
     }
 
     fun bind(index: Int, value: Int) {
         sqlite.bindInt(pointer, index, value)
     }
 
+    fun bind(name: String, value: Int) {
+        sqlite.bindInt(pointer, resolveParameterIndex(name), value)
+    }
+
     fun bind(index: Int, value: Long) {
         sqlite.bindInt64(pointer, index, value)
+    }
+
+    fun bind(name: String, value: Long) {
+        sqlite.bindInt64(pointer, resolveParameterIndex(name), value)
     }
 
     fun bind(index: Int, value: String) {
         sqlite.bindText(pointer, index, value)
     }
 
+    fun bind(name: String, value: String) {
+        sqlite.bindText(pointer, resolveParameterIndex(name), value)
+    }
+
     fun bindNull(index: Int) {
         sqlite.bindNull(pointer, index)
+    }
+
+    fun bindNull(name: String) {
+        sqlite.bindNull(pointer, resolveParameterIndex(name))
     }
 
     fun bindZeroBlob(index: Int, length: Int) {
@@ -159,4 +183,8 @@ internal class SQLPreparedStatement(
     }
 
     private fun Long.nextRandom() = random.nextLong(this)
+
+    private fun resolveParameterIndex(name: String): Int = sqlite.bindParameterIndex(pointer, name).also {
+        require(it > 0) { "Named parameter '$name' not found in SQL statement." }
+    }
 }

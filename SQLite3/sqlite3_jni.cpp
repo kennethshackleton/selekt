@@ -152,6 +152,20 @@ Java_com_bloomberg_selekt_ExternalSQLite_bindParameterCount(
 }
 
 extern "C" JNIEXPORT jint JNICALL
+Java_com_bloomberg_selekt_ExternalSQLite_bindParameterIndex(
+    JNIEnv* env,
+    jobject obj,
+    jlong jstatement,
+    jstring jname
+) {
+    auto statement = reinterpret_cast<sqlite3_stmt*>(jstatement);
+    auto name = env->GetStringUTFChars(jname, nullptr);
+    auto result = sqlite3_bind_parameter_index(statement, name);
+    env->ReleaseStringUTFChars(jname, name);
+    return result;
+}
+
+extern "C" JNIEXPORT jint JNICALL
 Java_com_bloomberg_selekt_ExternalSQLite_bindText(
     JNIEnv* env,
     jobject obj,

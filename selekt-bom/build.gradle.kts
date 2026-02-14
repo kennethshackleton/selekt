@@ -31,6 +31,7 @@ dependencies {
                 selektAndroidSqlcipher,
                 selektApi,
                 selektJava,
+                selektJdbc,
                 selektSqlite3Classes,
                 selektSqlite3Sqlcipher
             )

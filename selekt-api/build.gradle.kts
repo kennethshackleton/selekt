@@ -24,7 +24,6 @@ plugins {
     signing
     alias(libs.plugins.detekt)
     alias(libs.plugins.kover)
-    alias(libs.plugins.ktlint)
 }
 
 repositories {

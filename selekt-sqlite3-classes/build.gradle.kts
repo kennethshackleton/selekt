@@ -30,7 +30,6 @@ plugins {
     alias(libs.plugins.jmh)
     alias(libs.plugins.kover)
     alias(libs.plugins.detekt)
-    alias(libs.plugins.ktlint)
 }
 
 repositories {

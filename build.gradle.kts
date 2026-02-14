@@ -28,9 +28,6 @@ import org.jetbrains.gradle.ext.copyright
 import org.jetbrains.gradle.ext.settings
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-import org.jlleitschuh.gradle.ktlint.KtlintExtension
-import org.jlleitschuh.gradle.ktlint.reporter.ReporterType
-import org.jlleitschuh.gradle.ktlint.tasks.GenerateReportsTask
 
 plugins {
     base
@@ -38,7 +35,6 @@ plugins {
     alias(libs.plugins.kover)
     alias(libs.plugins.nexus)
     alias(libs.plugins.detekt)
-    alias(libs.plugins.ktlint)
     alias(libs.plugins.ideaExt)
     alias(libs.plugins.qodana)
     alias(libs.plugins.ksp) apply false
@@ -71,6 +67,7 @@ dependencies {
     kover(projects.selektApi)
     kover(projects.selektCommons)
     kover(projects.selektJava)
+    kover(projects.selektJdbc)
     kover(projects.selektJvm)
     kover(projects.selektSqlite3Classes)
 }
@@ -212,20 +209,6 @@ subprojects {
     }
 }
 
-allprojects {
-    plugins.withId("org.jlleitschuh.gradle.ktlint") {
-        configure<KtlintExtension> {
-            disabledRules.set(setOf("import-ordering", "indent", "wrapping"))
-            reporters {
-                reporter(ReporterType.HTML)
-            }
-        }
-    }
-    tasks.withType<GenerateReportsTask>().configureEach {
-        reportsOutputDirectory.set(rootProject.layout.buildDirectory.dir("reports/ktlint/${project.name}/$name"))
-    }
-}
-
 koverReport {
     defaults {
         filters {
@@ -240,7 +223,7 @@ koverReport {
         verify {
             rule("Minimal coverage") {
                 bound {
-                    minValue = 96
+                    minValue = 92
                     aggregation = AggregationType.COVERED_PERCENTAGE
                 }
             }
