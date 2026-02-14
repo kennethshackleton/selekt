@@ -1,6 +1,12 @@
 Change Log
 ==========
 
+## Version 0.28.0
+
+### Features
+
+* Experimental JDBC facade.
+
 ## Version 0.27.2
 
 ### Fixes
