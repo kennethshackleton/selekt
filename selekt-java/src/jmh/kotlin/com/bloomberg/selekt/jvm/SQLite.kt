@@ -16,7 +16,6 @@
 
 package com.bloomberg.selekt.jvm
 
-import com.bloomberg.selekt.SQLite
 import com.bloomberg.selekt.commons.loadEmbeddedLibrary
 import com.bloomberg.selekt.externalSQLiteSingleton
 

@@ -22,19 +22,18 @@ import com.bloomberg.selekt.pools.PoolConfiguration
 import com.bloomberg.selekt.pools.createObjectPool
 import java.io.Closeable
 import java.util.concurrent.ScheduledThreadPoolExecutor
-import java.util.concurrent.ThreadFactory
 import java.util.concurrent.TimeUnit
 import javax.annotation.concurrent.ThreadSafe
 
 private const val KEEP_ALIVE_MULTIPLIER = 1.5
 
-private val sharedExecutor = ScheduledThreadPoolExecutor(1, ThreadFactory {
+private val sharedExecutor = ScheduledThreadPoolExecutor(1) {
     Thread(it).apply {
         isDaemon = true
         name = "Selekt.Evictor"
         priority = Thread.NORM_PRIORITY
     }
-}).apply {
+}.apply {
     removeOnCancelPolicy = true
     setKeepAliveTime(
         (KEEP_ALIVE_MULTIPLIER * SQLiteJournalMode.WAL.databaseConfiguration.timeBetweenEvictionRunsMillis).toLong(),
