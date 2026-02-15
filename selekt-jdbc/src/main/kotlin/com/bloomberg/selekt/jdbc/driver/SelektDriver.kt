@@ -39,7 +39,6 @@ import org.slf4j.LoggerFactory
  * Supports the URL format: jdbc:selekt:path/to/database.sqlite[?properties]
  *
  * Supported connection properties:
- * - encrypt: Enable SQLCipher encryption (true/false)
  * - key: Encryption key (hex string or file path)
  * - poolSize: Maximum connection pool size (integer)
  * - busyTimeout: SQLite busy timeout in milliseconds (integer)
@@ -56,7 +55,6 @@ class SelektDriver : Driver {
         const val MAJOR_VERSION = 4
         const val MINOR_VERSION = 3
 
-        private const val PROPERTY_ENCRYPT = "encrypt"
         private const val PROPERTY_KEY = "key"
         private const val PROPERTY_POOL_SIZE = "poolSize"
         private const val PROPERTY_BUSY_TIMEOUT = "busyTimeout"
@@ -108,11 +106,6 @@ class SelektDriver : Driver {
         throw SQLException("Invalid URL format: $url")
     } else {
         arrayOf(
-            DriverPropertyInfo(PROPERTY_ENCRYPT, info.getProperty(PROPERTY_ENCRYPT, "false")).apply {
-                description = "Enable SQLCipher encryption"
-                required = false
-                choices = BOOLEAN_CHOICES
-            },
             DriverPropertyInfo(PROPERTY_KEY, info.getProperty(PROPERTY_KEY)).apply {
                 description = "Encryption key (hex string or file path)"
                 required = false
@@ -194,16 +187,12 @@ class SelektDriver : Driver {
         )
     }
 
-    private fun getEncryptionKey(properties: Properties): ByteArray? {
-        val encrypt = properties.getProperty(PROPERTY_ENCRYPT)?.toBoolean() == true
-        val keyProperty = properties.getProperty(PROPERTY_KEY)
-        if (!encrypt || keyProperty == null) {
-            return null
-        }
-        return when {
-            keyProperty.startsWith("0x") || keyProperty.startsWith("0X") ->
-                parseHexKey(keyProperty)
-            else -> parseStringOrFileKey(keyProperty)
+    private fun getEncryptionKey(
+        properties: Properties
+    ): ByteArray? = (properties.getProperty(PROPERTY_KEY) ?: return null).run {
+        when {
+            startsWith("0x") || startsWith("0X") -> parseHexKey(this)
+            else -> parseStringOrFileKey(this)
         }
     }
 
@@ -238,7 +227,6 @@ class SelektDriver : Driver {
         properties: Properties
     ): String {
         val propString = listOf(
-            PROPERTY_ENCRYPT,
             PROPERTY_KEY,
             PROPERTY_POOL_SIZE,
             PROPERTY_BUSY_TIMEOUT,
