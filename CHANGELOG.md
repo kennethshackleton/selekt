@@ -1,6 +1,12 @@
 Change Log
 ==========
 
+## Version 0.28.1
+
+### Fixes
+
+* Offer Selekt JDBC Driver among services.
+
 ## Version 0.28.0
 
 ### Features
