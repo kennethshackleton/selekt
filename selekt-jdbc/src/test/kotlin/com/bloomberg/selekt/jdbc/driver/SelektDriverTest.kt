@@ -101,7 +101,6 @@ internal class SelektDriverTest {
             assertNotNull(it)
             assertTrue(it.isNotEmpty())
         }.map(DriverPropertyInfo::name).run {
-            assertTrue(contains("encrypt"))
             assertTrue(contains("key"))
             assertTrue(contains("poolSize"))
             assertTrue(contains("busyTimeout"))
@@ -136,12 +135,6 @@ internal class SelektDriverTest {
 
     @Test
     fun propertyInfoDetails(): Unit = driver.getPropertyInfo("jdbc:selekt:/tmp/test.db", Properties()).run {
-        find { it.name == "encrypt" }.let {
-            assertNotNull(it)
-            assertEquals("Enable SQLCipher encryption", it.description)
-            assertFalse(it.required)
-            assertEquals("false", it.value)
-        }
         find { it.name == "key" }.let {
             assertNotNull(it)
             assertEquals("Encryption key (hex string or file path)", it.description)
@@ -176,7 +169,6 @@ internal class SelektDriverTest {
     fun connectWithProperties() {
         val url = "jdbc:selekt:/tmp/test.db"
         val properties = Properties().apply {
-            setProperty("encrypt", "true")
             setProperty("key", "test-key")
             setProperty("poolSize", "5")
             setProperty("busyTimeout", "2000")
@@ -190,7 +182,7 @@ internal class SelektDriverTest {
 
     @Test
     fun connectWithURLProperties() {
-        val url = "jdbc:selekt:/tmp/test.db?encrypt=true&key=test-key&poolSize=5"
+        val url = "jdbc:selekt:/tmp/test.db?key=test-key&poolSize=5"
         val properties = Properties()
         assertFailsWith<SQLException> {
             driver.connect(url, properties)
@@ -201,13 +193,13 @@ internal class SelektDriverTest {
     fun propertyInfoWithExistingProperties(): Unit = driver.getPropertyInfo(
         "jdbc:selekt:/tmp/test.db",
         Properties().apply {
-            setProperty("encrypt", "true")
             setProperty("poolSize", "20")
+            setProperty("key", "test-key")
         }
     ).run {
-        find { it.name == "encrypt" }.let {
+        find { it.name == "key" }.let {
             assertNotNull(it)
-            assertEquals("true", it.value)
+            assertEquals("test-key", it.value)
         }
         find { it.name == "poolSize" }.let {
             assertNotNull(it)
@@ -221,13 +213,12 @@ internal class SelektDriverTest {
 
     @Test
     fun booleanPropertyChoices(): Unit = driver.getPropertyInfo("jdbc:selekt:/tmp/test.db", Properties()).run {
-        for (propName in listOf("encrypt", "foreignKeys")) {
-            val property = find { it.name == propName }
-            assertNotNull(property, "Property $propName should exist")
-            assertNotNull(property.choices, "Property $propName should have choices")
-            assertEquals(2, property.choices.size, "Property $propName should have 2 choices")
-            assertTrue(property.choices.contains("true"), "Property $propName should have 'true' choice")
-            assertTrue(property.choices.contains("false"), "Property $propName should have 'false' choice")
+        find { it.name == "foreignKeys" }.let {
+            assertNotNull(it, "Property foreignKeys should exist")
+            assertNotNull(it.choices, "Property foreignKeys should have choices")
+            assertEquals(2, it.choices.size, "Property foreignKeys should have 2 choices")
+            assertTrue(it.choices.contains("true"), "Property foreignKeys should have 'true' choice")
+            assertTrue(it.choices.contains("false"), "Property foreignKeys should have 'false' choice")
         }
     }
 
@@ -276,7 +267,6 @@ internal class SelektDriverTest {
     @Test
     fun connectWithHexKey() {
         val properties = Properties().apply {
-            setProperty("encrypt", "true")
             setProperty("key", "0x0123456789ABCDEF")
         }
         assertFailsWith<SQLException> {
@@ -287,7 +277,6 @@ internal class SelektDriverTest {
     @Test
     fun connectWithHexKeyUppercasePrefix() {
         val properties = Properties().apply {
-            setProperty("encrypt", "true")
             setProperty("key", "0X0123456789ABCDEF")
         }
         assertFailsWith<SQLException> {
@@ -296,9 +285,8 @@ internal class SelektDriverTest {
     }
 
     @Test
-    fun connectWithEncryptFalse() {
+    fun connectWithKey() {
         val properties = Properties().apply {
-            setProperty("encrypt", "false")
             setProperty("key", "some-key")
         }
         assertFailsWith<SQLException> {
@@ -307,11 +295,9 @@ internal class SelektDriverTest {
     }
 
     @Test
-    fun connectWithEncryptTrueNoKey() {
+    fun connectWithoutKey() {
         val url = "jdbc:selekt:/tmp/test.db"
-        val properties = Properties().apply {
-            setProperty("encrypt", "true")
-        }
+        val properties = Properties()
         assertFailsWith<SQLException> {
             driver.connect(url, properties)
         }

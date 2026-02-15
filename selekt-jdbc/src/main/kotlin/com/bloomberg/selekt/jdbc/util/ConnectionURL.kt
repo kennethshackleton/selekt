@@ -23,7 +23,6 @@ import java.util.Properties
  * Supported format: jdbc:selekt:path/to/database.sqlite[?property=value&...]
  *
  * Supported properties:
- * - encrypt: Enable SQLCipher encryption (true/false)
  * - key: Encryption key (hex string or file path)
  * - poolSize: Maximum connection pool size (integer)
  * - busyTimeout: SQLite busy timeout in milliseconds (integer)
