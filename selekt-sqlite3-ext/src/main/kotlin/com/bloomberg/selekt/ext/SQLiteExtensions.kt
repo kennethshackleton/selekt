@@ -17,8 +17,6 @@
 package com.bloomberg.selekt.ext
 
 /**
- * Immutable description of a SQLite extension to load.
- *
  * @property libraryPath path to the shared library implementing the extension.
  * @property entryPoint optional entry point symbol. If null, SQLite resolves the default symbol.
  * @since 0.34.0
@@ -29,18 +27,12 @@ data class SQLiteExtension(
 )
 
 /**
- * SQL helpers for extension loading.
- *
  * @since 0.34.0
  */
 object SQLiteExtensionSql {
-    /**
-     * Builds a `SELECT load_extension(...)` SQL statement.
-     */
     @JvmStatic
     fun loadExtensionStatement(extension: SQLiteExtension): String {
         require(extension.libraryPath.isNotBlank()) { "Extension path must not be blank." }
-
         val pathLiteral = extension.libraryPath.asSqlLiteral()
         val entryPointClause = extension.entryPoint?.let { ", ${it.asSqlLiteral()}" }.orEmpty()
         return "SELECT load_extension($pathLiteral$entryPointClause)"
@@ -49,3 +41,10 @@ object SQLiteExtensionSql {
     private fun String.asSqlLiteral(): String = "'${replace("'", "''")}'"
 }
 
+/**
+ * @since 0.34.0
+ */
+object Vec1Sql {
+    @JvmStatic
+    fun infoStatement(): String = "SELECT vec1_info()"
+}

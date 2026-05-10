@@ -45,5 +45,9 @@ internal class SQLiteExtensionsTest {
             SQLiteExtensionSql.loadExtensionStatement(SQLiteExtension("   "))
         }
     }
-}
 
+    @Test
+    fun vec1InfoStatement() {
+        assertEquals("SELECT vec1_info()", Vec1Sql.infoStatement())
+    }
+}

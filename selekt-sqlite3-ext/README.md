@@ -4,6 +4,7 @@ Scaffolding module for SQLite extension support in Selekt.
 This module currently provides:
 - `SQLiteExtension` descriptor type
 - `SQLiteExtensionSql.loadExtensionStatement(...)` SQL builder with escaping
+- `Vec1Sql.infoStatement()` helper for checking embedded vec1 availability
 This keeps extension SQL generation centralized and reusable from Java and Android layers.
 ## Next steps
 - Add native-level extension loading APIs if required.

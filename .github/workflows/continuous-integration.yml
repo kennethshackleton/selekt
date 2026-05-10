@@ -14,20 +14,30 @@ jobs:
             platform: linux-amd64
             container: registry.access.redhat.com/ubi8/ubi:latest
             shell: bash
+            vec1_enabled: 'ON'
+            vec1_x86_avx2: 'ON'
           - os: ubuntu-24.04-arm
             platform: linux-aarch64
             container: registry.access.redhat.com/ubi8/ubi:latest
             shell: bash
+            vec1_enabled: 'ON'
+            vec1_x86_avx2: 'OFF'
           - os: ubuntu-latest
             platform: linux-amd64-musl
             container: alpine:3.20
             shell: sh
+            vec1_enabled: 'ON'
+            vec1_x86_avx2: 'ON'
           - os: macos-15
             platform: darwin-aarch64
             shell: bash
+            vec1_enabled: 'ON'
+            vec1_x86_avx2: 'OFF'
           - os: windows-latest
             platform: windows-amd64
             shell: bash
+            vec1_enabled: 'ON'
+            vec1_x86_avx2: 'ON'
     runs-on: ${{ matrix.os }}
     container: ${{ matrix.container }}
     defaults:
@@ -191,6 +201,8 @@ jobs:
           LDFLAGS: '-s'
           MACOSX_DEPLOYMENT_TARGET: ${{ runner.os == 'macOS' && '12.0' || '' }}
           CMAKE_PREFIX_PATH: ${{ runner.os == 'Windows' && 'C:/mimalloc' || '' }}
+          SELEKT_ENABLE_VEC1: ${{ matrix.vec1_enabled }}
+          SELEKT_VEC1_ENABLE_X86_AVX2: ${{ matrix.vec1_x86_avx2 }}
         run: |
           if [ "${{ runner.os }}" = "macOS" ]; then
             export CC=clang
@@ -244,6 +256,8 @@ jobs:
             -v "${{ github.workspace }}:/workspace" \
             -w /workspace \
             -e SELEKT_LIBC=musl \
+            -e SELEKT_ENABLE_VEC1=ON \
+            -e SELEKT_VEC1_ENABLE_X86_AVX2=OFF \
             -e CC=gcc \
             -e CXX=g++ \
             -e LDFLAGS='-s' \
@@ -311,6 +325,9 @@ jobs:
     name: 'Continuous Integration'
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      SELEKT_ENABLE_VEC1: 'ON'
+      SELEKT_VEC1_ENABLE_X86_AVX2: 'ON'
     steps:
       - name: 'Setup environment'
         run: |

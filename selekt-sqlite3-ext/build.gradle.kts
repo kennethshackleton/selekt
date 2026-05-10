@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-description = "Selekt SQLite extension loading scaffolding."
+description = "Selekt SQLite extensions."
 
 plugins {
     kotlin("jvm")
