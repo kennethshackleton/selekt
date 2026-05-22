@@ -70,6 +70,7 @@ dependencies {
     dokka(projects.selektJdbc)
     dokka(projects.selektJvm)
     dokka(projects.selektSqlite3Api)
+    "dokkaGfmPlugin"(libs.dokka.gfm)
     kover(projects.selektAndroid)
     kover(projects.selektApi)
     kover(projects.selektCommons)
@@ -206,6 +207,22 @@ subprojects {
                 sourceLink {
                     remoteUrl.set(URI("https://github.com/bloomberg/selekt/tree/master/${project.name}/src/main/kotlin"))
                     localDirectory.set(file("src/main/kotlin"))
+                }
+            }
+        }
+        val kdocJar = tasks.register<Jar>("kdocJar") {
+            description = "Packages Dokka HTML documentation for LLM/AI agent consumption."
+            group = "documentation"
+            archiveClassifier.set("kdoc")
+            tasks.named("dokkaGeneratePublicationHtml").let {
+                from(it)
+                dependsOn(it)
+            }
+        }
+        plugins.withId("maven-publish") {
+            configure<PublishingExtension> {
+                publications.withType<MavenPublication>().configureEach {
+                    artifact(kdocJar)
                 }
             }
         }
