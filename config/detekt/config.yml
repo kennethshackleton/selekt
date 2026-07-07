@@ -1,6 +1,11 @@
 build:
   maxIssues: 0
 
+selekt:
+  active: true
+  RequiresTrustedInput:
+    active: true
+
 processors:
   active: true
 

@@ -182,6 +182,11 @@ subprojects {
             debug = false
             ignoreFailures = false
         }
+        if (project.path != ":selekt-detekt-rules") {
+            dependencies {
+                add("detektPlugins", project(":selekt-detekt-rules"))
+            }
+        }
     }
     tasks.withType<Detekt>().configureEach {
         exclude("**/res/**")

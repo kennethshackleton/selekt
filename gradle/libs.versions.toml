@@ -2,6 +2,7 @@
 
 [versions]
 benchmark = "1.5.0-alpha06"
+detekt = "1.22.0"
 jmh = "1.37"
 lint = "31.5.2"
 room = "2.6.1"
@@ -22,6 +23,8 @@ androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "
 androidx-test-ext = { module = "androidx.test.ext:junit", version = "1.2.1" }
 androidx-test-rules = { module = "androidx.test:rules", version = "1.6.1" }
 androidx-test-runner = { module = "androidx.test:runner", version = "1.6.2" }
+detekt-api = { module = "io.gitlab.arturbosch.detekt:detekt-api", version.ref = "detekt" }
+detekt-test = { module = "io.gitlab.arturbosch.detekt:detekt-test", version.ref = "detekt" }
 exposed-bom = { module = "org.jetbrains.exposed:exposed-bom", version = "0.61.0" }
 exposed-core = { module = "org.jetbrains.exposed:exposed-core" }
 exposed-jdbc = { module = "org.jetbrains.exposed:exposed-jdbc" }
@@ -54,7 +57,7 @@ mockito = [
 [plugins]
 androidx-benchmark = { id = "androidx.benchmark", version.ref = "benchmark" }
 cash-licensee = { id = "app.cash.licensee", version = "1.14.1" }
-detekt = { id = "io.gitlab.arturbosch.detekt", version = "1.22.0" }
+detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
 dokka = { id = "org.jetbrains.dokka", version = "2.2.0" }
 ideaExt = { id = "org.jetbrains.gradle.plugin.idea-ext", version = "1.1.7" }
 jmh = { id = "me.champeau.jmh", version = "0.7.3" }
