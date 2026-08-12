@@ -384,6 +384,15 @@ class SQLDatabase(
         }
     }
 
+    fun readFromBlob(
+        table: String,
+        column: String,
+        row: Long,
+        offset: Int,
+        limit: Int,
+        stream: OutputStream
+    ) = readFromBlob("main", table, column, row, offset, limit, stream)
+
     @Suppress("Detekt.LongParameterList")
     fun readFromBlob(
         name: String,
@@ -404,6 +413,12 @@ class SQLDatabase(
     }
 
     override fun setTransactionSuccessful() = pledge { session().setTransactionSuccessful() }
+
+    fun sizeOfBlob(
+        table: String,
+        column: String,
+        row: Long
+    ) = sizeOfBlob("main", table, column, row)
 
     fun sizeOfBlob(
         name: String,
@@ -563,6 +578,14 @@ class SQLDatabase(
                 EMPTY_ARRAY
             )
         }
+
+    fun writeToBlob(
+        table: String,
+        column: String,
+        row: Long,
+        offset: Int,
+        stream: InputStream
+    ) = writeToBlob("main", table, column, row, offset, stream)
 
     @Suppress("Detekt.LongParameterList")
     fun writeToBlob(
