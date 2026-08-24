@@ -547,7 +547,7 @@ jobs:
             **/build/reports/detekt
 
       - name: 'Unit tests'
-        run: ./gradlew :selekt-android:testDebugUnitTest :selekt-java:test :selekt-jdbc:test :selekt-sqlite3-classes:testJava17 :selekt-sqlite3-classes:testJava25 :selekt-common:test :koverHtmlReport -x integrationTest ${{ env.SCAN }}
+        run: ./gradlew :selekt-android:testDebugUnitTest :selekt-java:test :selekt-jdbc:test :selekt-sqlite3-classes:testJava17 :selekt-sqlite3-classes:testJava25 :selekt-common:test :koverHtmlReport :koverXmlReport -x integrationTest ${{ env.SCAN }}
 
       - name: 'Archive test reports'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -573,6 +573,29 @@ jobs:
       - name: 'Verify coverage'
         run:
           ./gradlew :koverVerify -x integrationTest
+
+      - name: 'Extract coverage percentage'
+        id: coverage
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          COUNTER=$(grep -o '<counter type="LINE"[^/]*/>' build/reports/kover/report.xml | tail -1)
+          MISSED=$(echo "${COUNTER}" | grep -oP 'missed="\K[0-9]+')
+          COVERED=$(echo "${COUNTER}" | grep -oP 'covered="\K[0-9]+')
+          PERCENTAGE=$(awk "BEGIN { printf \"%.1f\", (${COVERED} / (${COVERED} + ${MISSED})) * 100 }")
+          echo "percentage=${PERCENTAGE}" >> "${GITHUB_OUTPUT}"
+
+      - name: 'Update coverage badge'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: schneegans/dynamic-badges-action@28b0fa8bdeb46170ac397105ece0c1fe58f68910
+        with:
+          auth: ${{ secrets.COVERAGE_GIST_TOKEN }}
+          gistID: ${{ vars.COVERAGE_GIST_ID }}
+          filename: selekt-coverage.json
+          label: coverage
+          message: ${{ steps.coverage.outputs.percentage }}%
+          valColorRange: ${{ steps.coverage.outputs.percentage }}
+          minColorRange: 50
+          maxColorRange: 90
 
       - name: 'Build others'
         run: |
