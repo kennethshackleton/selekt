@@ -34,6 +34,74 @@ Selekt Android requires Java 17.
 
 ### Using Room
 
+#### Room 2.8 and later (Recommended)
+
+Use `SelektSQLiteDriver` with Room 2.8 and later:
+
+The key must contain exactly 32 bytes and must not be all zero. The array remains yours: the driver does not modify it and
+copies it into protected native memory before creation returns. Clear your array immediately, including when driver
+creation fails. Room does not close the driver; retain it for the database's lifetime, then close the database before the
+driver. Closing the driver releases its native key.
+
+=== "Kotlin"
+    ``` kotlin
+    import com.bloomberg.selekt.android.room.createSelektSQLiteDriver
+
+    private fun deriveKey(): ByteArray? = TODO(
+        "Optional key, must be exactly 32-bytes long.")
+
+    val key = deriveKey()
+    val driver = try {
+        createSelektSQLiteDriver(SQLiteJournalMode.WAL, key)
+    } finally {
+        key?.fill(0)
+    }
+
+    val database = Room.databaseBuilder(context, MyAppDatabase::class.java, "app")
+        .setDriver(driver)
+        .build()
+
+    // When shutting down, close the database before its driver.
+    database.close()
+    driver.close()
+    ```
+
+=== "Java"
+    ``` java
+    import com.bloomberg.selekt.android.room.SelektSQLiteDriver;
+    import com.bloomberg.selekt.android.room.SelektSQLiteDriverKt;
+    import java.util.Arrays;
+
+    private byte[] deriveKey() {
+        // TODO Optional key, must be exactly 32-bytes long.
+    }
+
+    final byte[] key = deriveKey();
+    final SelektSQLiteDriver driver;
+    try {
+        driver = SelektSQLiteDriverKt.createSelektSQLiteDriver(
+            SQLiteJournalMode.WAL,
+            key);
+    } finally {
+        if (key != null) {
+            Arrays.fill(key, (byte) 0);
+        }
+    }
+
+    final RoomDatabase database = Room.databaseBuilder(
+        context, MyAppDatabase.class, "app"
+    ).setDriver(driver)
+        .build();
+
+    // When shutting down, close the database before its driver.
+    database.close();
+    driver.close();
+    ```
+
+#### Room 2.7 and earlier (Legacy)
+
+For older Room versions, use `SupportSQLiteOpenHelperFactory`:
+
 === "Kotlin"
     ``` kotlin
     private fun deriveKey(): ByteArray? = TODO(

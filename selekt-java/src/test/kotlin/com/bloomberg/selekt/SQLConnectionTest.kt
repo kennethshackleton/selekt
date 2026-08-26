@@ -357,6 +357,20 @@ internal class SQLConnectionTest {
     }
 
     @Test
+    fun prepareRejectsTooManyArguments(): Unit = sqlite.run {
+        whenever(prepareV2(any<Long>(), any<String>(), any<LongArray>())) doAnswer {
+            (it.arguments[2] as LongArray)[0] = 42L
+            SQL_OK
+        }
+        whenever(bindParameterCount(any<Long>())) doReturn 1
+        SQLConnection("file::memory:", this, databaseConfiguration, 0, CommonThreadLocalRandom, null).use {
+            assertFailsWith<IllegalArgumentException> {
+                it.executeForChangedRowCount("SELECT * FROM 'Foo' WHERE bar=?", arrayOf(1, 2))
+            }
+        }
+    }
+
+    @Test
     fun executeForLastInsertedRowIdChecksDone(): Unit = sqlite.run {
         whenever(openV2(any(), any(), any())) doAnswer {
             (it.arguments[2] as LongArray)[0] = 42L

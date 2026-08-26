@@ -76,5 +76,9 @@ internal interface SQLExecutor : BatchSQLExecutor {
 
     fun prepare(sql: String): SQLStatementInformation
 
+    fun prepareForRawStatement(sql: String): SQLPreparedStatement
+
+    fun releaseRawStatement(statement: SQLPreparedStatement)
+
     fun setTransactionListener(listener: SQLTransactionListener?)
 }
