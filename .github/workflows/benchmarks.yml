@@ -83,13 +83,38 @@ jobs:
           echo 'org.gradle.caching=false' >> gradle.properties
           echo "org.gradle.java.home=${JAVA_HOME}" >> gradle.properties
 
-      - name: 'Run JDBC benchmarks'
+      - name: 'Run JDBC batch-insert benchmarks'
         run: ./gradlew :selekt-jdbc:jmh -Pjmh.includes="JdbcBatchBenchmark\..*BatchInsert" -Pjmh.profilers=gc -Pjmh.params="batchSize=1000"
+
+      - name: 'Preserve batch-insert results'
+        run: cp selekt-jdbc/build/results/jmh/results.json /tmp/jdbc-batch-results.json
+
+      - name: 'Run JDBC text-stream benchmarks'
+        run: ./gradlew :selekt-jdbc:jmh -Pjmh.includes="JdbcStringStreamBenchmark\.(readAsciiStream|readCharacterStream)" -Pjmh.profilers=gc -Pjmh.params="driverKind=SELEKT,XERIAL;rowCount=50000;stringEncoding=ASCII,LATIN1,UTF16"
+
+      - name: 'Normalise text-stream benchmark names'
+        run: |
+          jq 'map(
+            if (.benchmark | contains(".JdbcStringStreamBenchmark.")) then
+              (.benchmark | split(".") | .[0:-1] | join(".")) as $class |
+              (.benchmark | split(".") | last) as $method |
+              .benchmark = (
+                $class + "." +
+                (.params.driverKind | ascii_downcase) +
+                (if $method == "readAsciiStream" then "AsciiStream" else "CharacterStream" end) +
+                .params.stringEncoding
+              ) |
+              .params = {}
+            else
+              .
+            end
+          )' selekt-jdbc/build/results/jmh/results.json > /tmp/jdbc-stream-results.json
 
       - name: 'Merge results'
         run: |
           jq -s 'add' \
-            selekt-jdbc/build/results/jmh/results.json \
+            /tmp/jdbc-batch-results.json \
+            /tmp/jdbc-stream-results.json \
             > /tmp/combined-results.json
 
       - name: 'Extract GC allocation metrics'
