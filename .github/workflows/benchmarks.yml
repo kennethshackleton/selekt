@@ -104,7 +104,7 @@ jobs:
                 (if $method == "readAsciiStream" then "AsciiStream" else "CharacterStream" end) +
                 .params.stringEncoding
               ) |
-              .params = {}
+              del(.params)
             else
               .
             end
