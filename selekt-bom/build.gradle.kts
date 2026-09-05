@@ -22,6 +22,10 @@ plugins {
     signing
 }
 
+repositories {
+    mavenCentral()
+}
+
 dependencies {
     constraints {
         projects.run {
