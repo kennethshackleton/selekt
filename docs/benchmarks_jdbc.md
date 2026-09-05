@@ -12,6 +12,18 @@ Latest JMH batch-insert results across drivers, updated periodically from CI. Lo
 
     <div id="jdbc_throughput"></div>
 
+### Text Stream Reads
+
+Latest JMH results for querying and fully consuming 50,000 text values through JDBC. Lower is better for both metrics.
+
+=== "Allocation"
+
+    <div id="jdbc_stream_allocation"></div>
+
+=== "Throughput"
+
+    <div id="jdbc_stream_throughput"></div>
+
 <script type="text/javascript">
 (function () {
   function loadScript(src, cb) {
@@ -42,18 +54,34 @@ Latest JMH batch-insert results across drivers, updated periodically from CI. Lo
     return pairs;
   }
 
-  var BENCH_ORDER = ['BatchInsertSIMPLE', 'BatchInsertMIXED', 'BatchInsertBLOB'];
+  var BATCH_BENCH_ORDER = ['BatchInsertSIMPLE', 'BatchInsertMIXED', 'BatchInsertBLOB'];
+  var STREAM_BENCH_ORDER = [
+    'AsciiStreamASCII',
+    'AsciiStreamLATIN1',
+    'AsciiStreamUTF16',
+    'CharacterStreamASCII',
+    'CharacterStreamLATIN1',
+    'CharacterStreamUTF16'
+  ];
+  var STREAM_BENCH_LABELS = {
+    'AsciiStreamASCII': 'getAsciiStream() — ASCII',
+    'AsciiStreamLATIN1': 'getAsciiStream() — Latin-1 characters',
+    'AsciiStreamUTF16': 'getAsciiStream() — euro and emoji',
+    'CharacterStreamASCII': 'getCharacterStream() — ASCII',
+    'CharacterStreamLATIN1': 'getCharacterStream() — Latin-1 characters',
+    'CharacterStreamUTF16': 'getCharacterStream() — euro and emoji'
+  };
 
-  function drawPairs(pairs, containerId, defaultUnit) {
+  function drawPairs(pairs, containerId, defaultUnit, prefix, benchOrder, labels) {
     var container = document.getElementById(containerId);
     var keys = Object.keys(pairs).filter(function (k) {
-      return k.startsWith('BatchInsert');
+      return k.startsWith(prefix);
     });
     keys.sort(function (a, b) {
-      var ai = BENCH_ORDER.indexOf(a);
-      var bi = BENCH_ORDER.indexOf(b);
-      if (ai === -1) ai = BENCH_ORDER.length;
-      if (bi === -1) bi = BENCH_ORDER.length;
+      var ai = benchOrder.indexOf(a);
+      var bi = benchOrder.indexOf(b);
+      if (ai === -1) ai = benchOrder.length;
+      if (bi === -1) bi = benchOrder.length;
       return ai - bi;
     });
     keys.forEach(function (base) {
@@ -84,7 +112,7 @@ Latest JMH batch-insert results across drivers, updated periodically from CI. Lo
       container.appendChild(div);
 
       new google.visualization.BarChart(div).draw(data, {
-        title: base,
+        title: labels[base] || base,
         legend: 'none',
         hAxis: { title: unit, minValue: 0 },
         chartArea: { width: '70%' }
@@ -105,19 +133,74 @@ Latest JMH batch-insert results across drivers, updated periodically from CI. Lo
     google.charts.load('current', { packages: ['corechart'] });
     google.charts.setOnLoadCallback(function () {
       if (allocData) {
-        drawPairs(pairBenches(allocData), 'jdbc_allocation', 'B/op');
+        var allocationPairs = pairBenches(allocData);
+        drawPairs(
+          allocationPairs,
+          'jdbc_allocation',
+          'B/op',
+          'BatchInsert',
+          BATCH_BENCH_ORDER,
+          {}
+        );
+        drawPairs(
+          allocationPairs,
+          'jdbc_stream_allocation',
+          'B/op',
+          'AsciiStream',
+          STREAM_BENCH_ORDER,
+          STREAM_BENCH_LABELS
+        );
+        drawPairs(
+          allocationPairs,
+          'jdbc_stream_allocation',
+          'B/op',
+          'CharacterStream',
+          STREAM_BENCH_ORDER,
+          STREAM_BENCH_LABELS
+        );
       } else {
         document.getElementById('jdbc_allocation').textContent =
           'Allocation data not yet available. Results will appear after the first CI run.';
+        document.getElementById('jdbc_stream_allocation').textContent =
+          'Allocation data not yet available. Results will appear after the first CI run.';
       }
-      var throughputDrawn = false;
-      function drawThroughputIfNeeded() {
-        if (throughputDrawn) return;
-        var el = document.getElementById('jdbc_throughput');
+      var throughputTargets = [
+        {
+          id: 'jdbc_throughput',
+          prefix: 'BatchInsert',
+          order: BATCH_BENCH_ORDER,
+          labels: {},
+          drawn: false
+        },
+        {
+          id: 'jdbc_stream_throughput',
+          prefix: 'AsciiStream',
+          order: STREAM_BENCH_ORDER,
+          labels: STREAM_BENCH_LABELS,
+          drawn: false
+        },
+        {
+          id: 'jdbc_stream_throughput',
+          prefix: 'CharacterStream',
+          order: STREAM_BENCH_ORDER,
+          labels: STREAM_BENCH_LABELS,
+          drawn: false
+        }
+      ];
+      function drawThroughputIfNeeded(target) {
+        if (target.drawn) return;
+        var el = document.getElementById(target.id);
         if (el && el.offsetWidth > 0) {
-          throughputDrawn = true;
+          target.drawn = true;
           if (throughputData) {
-            drawPairs(pairBenches(throughputData), 'jdbc_throughput', 'ms/op');
+            drawPairs(
+              pairBenches(throughputData),
+              target.id,
+              'ms/op',
+              target.prefix,
+              target.order,
+              target.labels
+            );
           } else {
             el.textContent =
               'Benchmark data not yet available. Results will appear after the first CI run.';
@@ -126,9 +209,12 @@ Latest JMH batch-insert results across drivers, updated periodically from CI. Lo
       }
       document.querySelectorAll('input[name^="__tabbed_"]').forEach(function (input) {
         input.addEventListener('change', function () {
-          setTimeout(drawThroughputIfNeeded, 50);
+          setTimeout(function () {
+            throughputTargets.forEach(drawThroughputIfNeeded);
+          }, 50);
         });
       });
+      throughputTargets.forEach(drawThroughputIfNeeded);
     });
   }
 

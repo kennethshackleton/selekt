@@ -620,6 +620,21 @@ internal class JdbcResultSetTest {
     }
 
     @Test
+    fun getAsciiStreamDirectlyFromUtf8Bytes() {
+        val value = "ASCII-é-😀"
+        mockCursor.run {
+            whenever(isNull(1)) doReturn false
+            whenever(getBlob(1)) doReturn value.toByteArray(Charsets.UTF_8)
+        }
+        resultSet.getAsciiStream(2).use {
+            assertEquals(
+                value.toByteArray(Charsets.US_ASCII).toList(),
+                it?.readBytes()?.toList()
+            )
+        }
+    }
+
+    @Test
     fun getUnicodeStream() {
         mockCursor.run {
             whenever(isNull(1)) doReturn false
@@ -686,6 +701,26 @@ internal class JdbcResultSetTest {
         }
         resultSet.getCharacterStream("name").use {
             assertEquals("named stream", it?.readText())
+        }
+    }
+
+    @Test
+    fun getCharacterStreamDirectlyFromUtf8Bytes() {
+        val value = "ASCII-é-😀"
+        mockCursor.run {
+            whenever(isNull(1)) doReturn false
+            whenever(getBlob(1)) doReturn value.toByteArray(Charsets.UTF_8)
+        }
+        resultSet.getCharacterStream(2).use { reader ->
+            val actual = buildString {
+                val buffer = CharArray(1)
+                var read = reader?.read(buffer) ?: -1
+                while (read != -1) {
+                    append(buffer, 0, read)
+                    read = reader?.read(buffer) ?: -1
+                }
+            }
+            assertEquals(value, actual)
         }
     }
 

@@ -24,6 +24,7 @@ import com.bloomberg.selekt.jdbc.lob.JdbcBlob
 import com.bloomberg.selekt.jdbc.lob.JdbcClob
 import com.bloomberg.selekt.jdbc.statement.JdbcStatement
 import com.bloomberg.selekt.jdbc.util.TypeMapping
+import java.io.ByteArrayInputStream
 import java.io.InputStream
 import java.io.Reader
 import java.math.BigDecimal
@@ -51,6 +52,218 @@ import java.util.Calendar
 import javax.annotation.concurrent.NotThreadSafe
 
 private const val READ_ONLY_ERROR = "ResultSet is read-only"
+
+private fun asciiStream(utf8: ByteArray): InputStream {
+    var readPosition = utf8.indexOfFirst { it < 0 }
+    if (readPosition == -1) {
+        return ByteArrayInputStream(utf8)
+    }
+    var writePosition = readPosition
+    while (readPosition < utf8.size) {
+        val byte = utf8[readPosition]
+        if (byte >= 0) {
+            utf8[writePosition++] = byte
+            readPosition += 1
+        } else {
+            val sequenceLength = validUtf8SequenceLength(utf8, readPosition)
+            utf8[writePosition++] = '?'.code.toByte()
+            readPosition += sequenceLength
+        }
+    }
+    return ByteArrayInputStream(utf8, 0, writePosition)
+}
+
+@Suppress("ComplexCondition", "MagicNumber", "ReturnCount", "UnnecessaryParentheses")
+private fun validUtf8SequenceLength(utf8: ByteArray, position: Int): Int {
+    val first = utf8[position].toInt() and 0xFF
+    val continuationCount = when (first) {
+        in 0xC2..0xDF -> 1
+        in 0xE0..0xEF -> 2
+        in 0xF0..0xF4 -> 3
+        else -> return 1
+    }
+    if (position + continuationCount >= utf8.size) {
+        return 1
+    }
+    val second = utf8[position + 1].toInt() and 0xFF
+    if (second !in 0x80..0xBF ||
+        first == 0xE0 && second < 0xA0 ||
+        first == 0xED && second >= 0xA0 ||
+        first == 0xF0 && second < 0x90 ||
+        first == 0xF4 && second >= 0x90
+    ) {
+        return 1
+    }
+    repeat(continuationCount - 1) {
+        if ((utf8[position + 2 + it].toInt() and 0xFF) !in 0x80..0xBF) {
+            return 1
+        }
+    }
+    return continuationCount + 1
+}
+
+private fun utf8Reader(utf8: ByteArray): Reader = Utf8ByteArrayReader(utf8)
+
+@Suppress(
+    "CognitiveComplexMethod",
+    "ComplexCondition",
+    "MagicNumber",
+    "ReturnCount",
+    "UnnecessaryParentheses"
+)
+private class Utf8ByteArrayReader(
+    private val bytes: ByteArray
+) : Reader() {
+    private var position = 0
+    private var pendingLowSurrogate = 0
+
+    override fun close() = Unit
+
+    override fun read(): Int {
+        if (pendingLowSurrogate != 0) {
+            return pendingLowSurrogate.also { pendingLowSurrogate = 0 }
+        }
+        if (position >= bytes.size) {
+            return -1
+        }
+        val codePoint = nextCodePoint()
+        return if (codePoint <= Char.MAX_VALUE.code) {
+            codePoint
+        } else {
+            pendingLowSurrogate = Character.lowSurrogate(codePoint).code
+            Character.highSurrogate(codePoint).code
+        }
+    }
+
+    override fun read(
+        destination: CharArray,
+        offset: Int,
+        length: Int
+    ): Int {
+        validateBounds(destination, offset, length)
+        if (length == 0) {
+            return 0
+        }
+        var copied = copyPendingLowSurrogate(destination, offset)
+        while (copied < length && position < bytes.size) {
+            val ascii = bytes[position].toInt()
+            if (ascii >= 0) {
+                destination[offset + copied++] = ascii.toChar()
+                position += 1
+                continue
+            }
+            val codePoint = nextCodePoint()
+            if (codePoint <= Char.MAX_VALUE.code) {
+                destination[offset + copied++] = codePoint.toChar()
+            } else {
+                destination[offset + copied++] = Character.highSurrogate(codePoint)
+                val lowSurrogate = Character.lowSurrogate(codePoint)
+                if (copied < length) {
+                    destination[offset + copied++] = lowSurrogate
+                } else {
+                    pendingLowSurrogate = lowSurrogate.code
+                }
+            }
+        }
+        if (copied == 0) {
+            return -1
+        }
+        return copied
+    }
+
+    private fun validateBounds(
+        destination: CharArray,
+        offset: Int,
+        length: Int
+    ) {
+        if (offset < 0 || length < 0 || offset > destination.size - length) {
+            throw IndexOutOfBoundsException(
+                "Size: ${destination.size}; offset: $offset; length: $length"
+            )
+        }
+    }
+
+    private fun copyPendingLowSurrogate(
+        destination: CharArray,
+        offset: Int
+    ): Int = if (pendingLowSurrogate == 0) {
+        0
+    } else {
+        destination[offset] = pendingLowSurrogate.toChar()
+        pendingLowSurrogate = 0
+        1
+    }
+
+    private fun nextCodePoint(): Int {
+        val first = bytes[position++].toInt() and 0xFF
+        if (first < 0x80) {
+            return first
+        }
+        return when (first) {
+            in 0xC2..0xDF -> decodeTwoBytes(first)
+            in 0xE0..0xEF -> decodeThreeBytes(first)
+            in 0xF0..0xF4 -> decodeFourBytes(first)
+            else -> REPLACEMENT_CHARACTER
+        }
+    }
+
+    private fun decodeTwoBytes(first: Int): Int {
+        if (position >= bytes.size) {
+            return REPLACEMENT_CHARACTER
+        }
+        val second = bytes[position].toInt() and 0xFF
+        if (second !in 0x80..0xBF) {
+            return REPLACEMENT_CHARACTER
+        }
+        position += 1
+        return (first and 0x1F) shl 6 or (second and 0x3F)
+    }
+
+    private fun decodeThreeBytes(first: Int): Int {
+        if (position + 1 >= bytes.size) {
+            return REPLACEMENT_CHARACTER
+        }
+        val second = bytes[position].toInt() and 0xFF
+        val third = bytes[position + 1].toInt() and 0xFF
+        if (second !in 0x80..0xBF ||
+            third !in 0x80..0xBF ||
+            first == 0xE0 && second < 0xA0 ||
+            first == 0xED && second >= 0xA0
+        ) {
+            return REPLACEMENT_CHARACTER
+        }
+        position += 2
+        return (first and 0x0F) shl 12 or
+            ((second and 0x3F) shl 6) or
+            (third and 0x3F)
+    }
+
+    private fun decodeFourBytes(first: Int): Int {
+        if (position + 2 >= bytes.size) {
+            return REPLACEMENT_CHARACTER
+        }
+        val second = bytes[position].toInt() and 0xFF
+        val third = bytes[position + 1].toInt() and 0xFF
+        val fourth = bytes[position + 2].toInt() and 0xFF
+        if (second !in 0x80..0xBF ||
+            third !in 0x80..0xBF ||
+            fourth !in 0x80..0xBF ||
+            first == 0xF0 && second < 0x90 ||
+            first == 0xF4 && second >= 0x90
+        ) {
+            return REPLACEMENT_CHARACTER
+        }
+        position += 3
+        return (first and 0x07) shl 18 or
+            ((second and 0x3F) shl 12) or
+            ((third and 0x3F) shl 6) or
+            (fourth and 0x3F)
+    }
+
+    private companion object {
+        const val REPLACEMENT_CHARACTER = 0xFFFD
+    }
+}
 
 /**
  * @since 0.28.0
@@ -607,7 +820,11 @@ internal class JdbcResultSet(
 
     override fun getAsciiStream(
         columnIndex: Int
-    ): InputStream? = getString(columnIndex)?.byteInputStream(Charsets.US_ASCII)
+    ): InputStream? = textStreamValue(
+        columnIndex = columnIndex,
+        fromUtf8 = ::asciiStream,
+        fallback = { it.byteInputStream(Charsets.US_ASCII) }
+    )
 
     override fun getAsciiStream(columnLabel: String): InputStream? = getAsciiStream(findColumn(columnLabel))
 
@@ -624,9 +841,49 @@ internal class JdbcResultSet(
 
     override fun getBinaryStream(columnLabel: String): InputStream? = getBinaryStream(findColumn(columnLabel))
 
-    override fun getCharacterStream(columnIndex: Int): Reader? = getString(columnIndex)?.reader()
+    override fun getCharacterStream(columnIndex: Int): Reader? = textStreamValue(
+        columnIndex = columnIndex,
+        fromUtf8 = ::utf8Reader,
+        fallback = String::reader
+    )
 
     override fun getCharacterStream(columnLabel: String): Reader? = getCharacterStream(findColumn(columnLabel))
+
+    private inline fun <T> textStreamValue(
+        columnIndex: Int,
+        fromUtf8: (ByteArray) -> T,
+        fallback: (String) -> T
+    ): T? {
+        checkClosed()
+        validateColumnIndex(columnIndex)
+        return try {
+            val cursorIndex = columnIndex - 1
+            when (cursor.type(cursorIndex)) {
+                ColumnType.NULL -> {
+                    wasNull = true
+                    null
+                }
+                ColumnType.STRING -> {
+                    wasNull = false
+                    cursor.getBlob(cursorIndex)?.let(fromUtf8)
+                        ?: cursor.getString(cursorIndex)?.let(fallback)
+                }
+                else -> {
+                    wasNull = false
+                    cursor.getString(cursorIndex)?.let(fallback)
+                }
+            }
+        } catch (e: SQLException) {
+            throw SQLExceptionMapper.mapException(e)
+        } catch (e: RuntimeException) {
+            throw SQLExceptionMapper.mapException(
+                "Error getting text stream from column $columnIndex: ${e.message}",
+                -1,
+                -1,
+                e
+            )
+        }
+    }
 
     override fun getWarnings(): SQLWarning? = null
 
