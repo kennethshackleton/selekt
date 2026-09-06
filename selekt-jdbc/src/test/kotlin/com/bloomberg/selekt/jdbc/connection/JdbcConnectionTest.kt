@@ -16,6 +16,7 @@
 
 package com.bloomberg.selekt.jdbc.connection
 
+import com.bloomberg.selekt.ISQLRawStatement
 import com.bloomberg.selekt.SQLDatabase
 import com.bloomberg.selekt.SQLDatabaseSession
 import com.bloomberg.selekt.SQLitePragma
@@ -44,7 +45,9 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.mockito.kotlin.any
 import org.mockito.kotlin.anyOrNull
+import org.mockito.kotlin.doAnswer
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.doThrow
 import org.mockito.kotlin.mock
@@ -60,10 +63,19 @@ internal class JdbcConnectionTest {
 
     @BeforeEach
     fun setUp() {
-        mockDatabase = mock()
+        mockDatabase = parameterCountingDatabase()
         connectionURL = ConnectionURL.parse("jdbc:sqlite:/tmp/test.db")
         properties = Properties()
         connection = JdbcConnection(testSharedDatabase(mockDatabase), connectionURL, properties)
+    }
+
+    private fun parameterCountingDatabase(): SQLDatabase = mock {
+        whenever(it.prepare(any())) doAnswer { invocation ->
+            val parameterCount = invocation.getArgument<String>(0).count { character -> character == '?' }
+            mock<ISQLRawStatement> {
+                whenever(it.parameterCount) doReturn parameterCount
+            }
+        }
     }
 
     @Test
@@ -1382,7 +1394,11 @@ internal class JdbcConnectionTest {
     @Test
     fun preparedStatementPoolSurvivesConcurrentReturnsAndClose() {
         repeat(8) {
-            val freshConnection = JdbcConnection(testSharedDatabase(mock()), connectionURL, properties)
+            val freshConnection = JdbcConnection(
+                testSharedDatabase(parameterCountingDatabase()),
+                connectionURL,
+                properties
+            )
             val statements = (0 until 64).map { i ->
                 freshConnection.prepareStatement("SELECT $i") as JdbcPreparedStatement
             }
