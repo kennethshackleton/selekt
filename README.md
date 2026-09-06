@@ -1,11 +1,12 @@
 # Selekt
 
-[![Apache 2.0](https://img.shields.io/badge/license-Apache%202-blue.svg)](LICENSE)
-[![Maven Central](https://img.shields.io/maven-central/v/com.bloomberg.selekt/selekt-android.svg)](https://search.maven.org/artifact/com.bloomberg.selekt/selekt-android)
-[![KDoc](https://img.shields.io/static/v1?label=docs&message=KDoc&color=1AA2D4)](https://bloomberg.github.io/selekt/kdoc/selekt-android/index.html)
+[![Apache 2.0](https://img.shields.io/badge/license-Apache%202-blue.svg)](LICENSE) [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/bloomberg/selekt/badge)](https://securityscorecards.dev/viewer/?uri=github.com/bloomberg/selekt)
 
-[![OpenSSF
-Scorecard](https://api.securityscorecards.dev/projects/github.com/bloomberg/selekt/badge)](https://securityscorecards.dev/viewer/?uri=github.com/bloomberg/selekt)
+[![Android Maven Central](https://img.shields.io/maven-central/v/com.bloomberg.selekt/selekt-android.svg?label=Android%20Maven%20Central&color=3DDC84)](https://search.maven.org/artifact/com.bloomberg.selekt/selekt-android)
+[![JDBC Maven Central](https://img.shields.io/maven-central/v/com.bloomberg.selekt/selekt-jdbc.svg?label=JDBC%20Maven%20Central&color=ED8B00)](https://search.maven.org/artifact/com.bloomberg.selekt/selekt-jdbc)
+
+[![Android KDoc](https://img.shields.io/static/v1?label=Android%20KDoc&message=KDoc&color=3DDC84)](https://bloomberg.github.io/selekt/kdoc/selekt-android/index.html)
+[![JDBC KDoc](https://img.shields.io/static/v1?label=JDBC%20KDoc&message=KDoc&color=ED8B00)](https://bloomberg.github.io/selekt/kdoc/selekt-jdbc/index.html)
 
 Selekt is a familiar Android and JDBC SQLite database library that by default wraps the community edition of [SQLCipher](https://www.zetetic.net/sqlcipher/open-source/), an SQLite extension that provides 256-bit AES encryption of database files. Selekt realises the maximum concurrency offered by SQLite3: When enabled for WAL-journal mode, "readers do not block writers and a writer does not block readers. Reading and writing can proceed concurrently."
 
