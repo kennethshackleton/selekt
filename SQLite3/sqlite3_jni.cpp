@@ -105,7 +105,7 @@ namespace {
     static_assert(containsKeyingPragma("EXPLAIN QUERY PLAN PRAGMA hexrekey = 'secret'"));
     static_assert(containsKeyingPragma("EXPLAIN PRAGMA temp.textkey = 'secret'"));
     static_assert(containsKeyingPragma("/* leading */ PRAGMA \"main\".textrekey('secret')"));
-    static_assert(containsKeyingPragma("\u{FEFF}PRAGMA key = 'secret'"));
+    static_assert(containsKeyingPragma("\uFEFFPRAGMA key = 'secret'"));
     static_assert(containsKeyingPragma("SELECT 'PRAGMA key = secret'"));
     static_assert(!containsKeyingPragma("PRAGMA journal_mode=WAL"));
     static_assert(!containsKeyingPragma("PRAGMA foreign_keys=ON"));
