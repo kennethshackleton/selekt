@@ -57,7 +57,7 @@ internal class ExternalSQLite(
     @GuardedBy("callbackRegistryLock")
     private val activeListeners = mutableMapOf<Long, CommitHookRegistration>()
     @GuardedBy("callbackRegistryLock")
-    private val activeProgressHandlers = mutableMapOf<Long, ProgressHandlerRegistration>()
+    private val progressHandlerRegistrations = mutableMapOf<Long, ProgressHandlerRegistration>()
 
     private data class CommitHookRegistration(
         val commitStub: MemorySegment,
@@ -66,9 +66,16 @@ internal class ExternalSQLite(
     )
 
     private data class ProgressHandlerRegistration(
+        val dispatcher: ProgressHandlerDispatcher,
         val stub: MemorySegment,
         val arena: Arena
     )
+
+    private class ProgressHandlerDispatcher(
+        @Volatile var delegate: SQLProgressHandler
+    ) : SQLProgressHandler {
+        override fun onProgress() = delegate.onProgress()
+    }
 
     init {
         loader()
@@ -551,10 +558,12 @@ internal class ExternalSQLite(
     override fun closeV2(
         db: Long
     ): SQLCode = callbackRegistryLock.withLock {
-        (sqlite3_close_v2.invoke(MemorySegment.ofAddress(db)) as Int).also { result ->
+        val segment = MemorySegment.ofAddress(db)
+        sqlite3_progress_handler.invoke(segment, 0, MemorySegment.NULL, MemorySegment.NULL)
+        (sqlite3_close_v2.invoke(segment) as Int).also { result ->
             if (result == SQL_OK) {
                 activeListeners.remove(db)?.arena?.close()
-                activeProgressHandlers.remove(db)?.arena?.close()
+                progressHandlerRegistrations.remove(db)?.arena?.close()
             }
         }
     }
@@ -943,17 +952,20 @@ internal class ExternalSQLite(
     ) {
         callbackRegistryLock.withLock {
             val segment = MemorySegment.ofAddress(db)
-            if (handler != null) {
-                val arena = Arena.ofShared()
-                val registration = ProgressHandlerRegistration(
-                    stub = createProgressHandlerStub(handler, arena),
-                    arena = arena
-                )
+            if (handler != null && instructionCount > 0) {
+                val registration = progressHandlerRegistrations[db] ?: run {
+                    val arena = Arena.ofShared()
+                    val dispatcher = ProgressHandlerDispatcher(handler)
+                    ProgressHandlerRegistration(
+                        dispatcher = dispatcher,
+                        stub = createProgressHandlerStub(dispatcher, arena),
+                        arena = arena
+                    ).also { progressHandlerRegistrations[db] = it }
+                }
+                registration.dispatcher.delegate = handler
                 sqlite3_progress_handler.invoke(segment, instructionCount, registration.stub, MemorySegment.NULL)
-                activeProgressHandlers.put(db, registration)?.arena?.close()
             } else {
                 sqlite3_progress_handler.invoke(segment, 0, MemorySegment.NULL, MemorySegment.NULL)
-                activeProgressHandlers.remove(db)?.arena?.close()
             }
         }
     }

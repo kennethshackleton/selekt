@@ -21,6 +21,7 @@ import org.junit.jupiter.api.io.TempDir
 import java.io.File
 import java.nio.ByteOrder
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.abs
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -118,6 +119,46 @@ internal class ExternalSQLiteTest {
                 sqlite.finalize(statement)
             }
         } finally {
+            sqlite.closeV2(db)
+        }
+    }
+
+    @Test
+    fun `progress handler can be replaced and cleared`() {
+        val dbHolder = LongArray(1)
+        sqlite.openV2(File(tempDir, "test.db").absolutePath, SQL_OPEN_READWRITE_OR_CREATE, dbHolder)
+        val db = dbHolder[0]
+        val firstCalls = AtomicInteger()
+        val secondCalls = AtomicInteger()
+        val sql = """
+            WITH RECURSIVE counter(value) AS (
+                VALUES(0)
+                UNION ALL
+                SELECT value + 1 FROM counter WHERE value < 100
+            )
+            SELECT sum(value) FROM counter
+        """.trimIndent()
+        try {
+            sqlite.progressHandler(db, 1) {
+                firstCalls.incrementAndGet()
+                0
+            }
+            assertEquals(SQL_OK, sqlite.exec(db, sql))
+            assertTrue(firstCalls.get() > 0)
+            val firstCallsAfterReplacement = firstCalls.get()
+            sqlite.progressHandler(db, 1) {
+                secondCalls.incrementAndGet()
+                0
+            }
+            assertEquals(SQL_OK, sqlite.exec(db, sql))
+            assertEquals(firstCallsAfterReplacement, firstCalls.get())
+            assertTrue(secondCalls.get() > 0)
+            val secondCallsAfterClearing = secondCalls.get()
+            sqlite.progressHandler(db, 0, null)
+            assertEquals(SQL_OK, sqlite.exec(db, sql))
+            assertEquals(secondCallsAfterClearing, secondCalls.get())
+        } finally {
+            sqlite.progressHandler(db, 0, null)
             sqlite.closeV2(db)
         }
     }
