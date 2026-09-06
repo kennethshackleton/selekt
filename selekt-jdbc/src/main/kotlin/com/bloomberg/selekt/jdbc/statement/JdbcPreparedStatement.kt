@@ -139,12 +139,14 @@ internal open class JdbcPreparedStatement(
             val signal = activateCancellationSignalOrNull()
             runCatching {
                 val cursor = queryWithSignal(applyMaxRows(sql), materializedArgs, signal)
-                JdbcResultSet(
-                    cursor,
-                    this,
-                    resultSetType,
-                    resultSetConcurrency,
-                    resultSetHoldability
+                trackResultSet(
+                    JdbcResultSet(
+                        cursor,
+                        this,
+                        resultSetType,
+                        resultSetConcurrency,
+                        resultSetHoldability
+                    )
                 )
             }.getOrElse {
                 deactivateCancellationSignal()
@@ -162,6 +164,7 @@ internal open class JdbcPreparedStatement(
         checkClosed()
         connection.checkWritable()
         return try {
+            closeCurrentResultSet()
             connection.ensureTransaction()
             parameterRow.materializeTo(materializedArgs)
             val signal = activateCancellationSignalOrNull()
@@ -276,6 +279,7 @@ internal open class JdbcPreparedStatement(
 
     override fun executeBatch(): IntArray {
         checkClosed()
+        closeCurrentResultSet()
         if (totalBatchCount == 0) {
             return IntArray(0)
         }

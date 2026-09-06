@@ -404,6 +404,9 @@ internal class JdbcConnection private constructor(
     }
 
     internal fun returnPreparedStatement(statement: JdbcPreparedStatement): Boolean {
+        if (statement.hasOpenResultSet()) {
+            return false
+        }
         var accepted = false
         var evicted: JdbcPreparedStatement? = null
         if (!closed) {

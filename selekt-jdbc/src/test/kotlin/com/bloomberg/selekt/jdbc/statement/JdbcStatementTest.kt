@@ -492,6 +492,15 @@ internal class JdbcStatementTest {
     }
 
     @Test
+    fun executeBatchClosesCurrentResultSet() {
+        whenever(mockDatabase.query(any<String>(), any<Array<Any?>>())) doReturn mockCursor
+        statement.executeQuery("SELECT * FROM users")
+        assertTrue(statement.executeBatch().isEmpty())
+        verify(mockCursor).close()
+        assertNull(statement.resultSet)
+    }
+
+    @Test
     fun getResultSetAfterUpdate() {
         val sqlStatement = mock<ISQLStatement> {
             whenever(it.executeInsert()) doReturn 1L

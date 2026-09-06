@@ -57,6 +57,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import org.junit.jupiter.api.AfterEach
 import org.mockito.kotlin.doReturn
@@ -94,11 +95,42 @@ internal class JdbcPreparedStatementTest {
     @Test
     fun executeQuery() {
         whenever(database.query(any<String>(), any<Array<Any?>>())) doReturn cursor
-        assertTrue(preparedStatement.apply {
+        val resultSet = preparedStatement.apply {
             setInt(1, 42)
             setString(2, "test")
-        }.executeQuery() is JdbcResultSet)
+        }.executeQuery()
+        assertTrue(resultSet is JdbcResultSet)
+        assertSame(resultSet, preparedStatement.resultSet)
         verify(database).query(any<String>(), any<Array<Any?>>())
+    }
+
+    @Test
+    fun closeClosesCurrentResultSetBeforePooling() {
+        whenever(database.query(any<String>(), any<Array<Any?>>())) doReturn cursor
+        preparedStatement.executeQuery()
+        preparedStatement.close()
+        verify(cursor).close()
+        assertNull(preparedStatement.resultSet)
+        assertTrue(preparedStatement.isClosed)
+    }
+
+    @Test
+    fun executeQueryClosesPreviousResultSet() {
+        var firstCursorClosed = false
+        val firstCursor = mock<ICursor> {
+            whenever(it.isClosed()) doAnswer { firstCursorClosed }
+            whenever(it.close()) doAnswer {
+                firstCursorClosed = true
+            }
+        }
+        val secondCursor = mock<ICursor>()
+        whenever(database.query(any<String>(), any<Array<Any?>>()))
+            .thenReturn(firstCursor, secondCursor)
+        val firstResultSet = preparedStatement.executeQuery()
+        val secondResultSet = preparedStatement.executeQuery()
+        verify(firstCursor).close()
+        assertSame(secondResultSet, preparedStatement.resultSet)
+        assertTrue(firstResultSet.isClosed)
     }
 
     @Test
@@ -125,7 +157,47 @@ internal class JdbcPreparedStatementTest {
             setInt(1, 42)
             setString(2, "test")
         }.execute())
+        assertNotNull(preparedStatement.resultSet)
         verify(database).query(any<String>(), any<Array<Any?>>())
+    }
+
+    @Test
+    fun executeUpdateClosesPreviousResultSet() {
+        whenever(database.query(any<String>(), any<Array<Any?>>())) doReturn cursor
+        preparedStatement.executeQuery()
+        val updateStatement = mock<ISQLStatement>()
+        whenever(database.compileStatement(any<String>(), any<Array<Any?>>())) doReturn updateStatement
+        preparedStatement.executeUpdate()
+        verify(cursor).close()
+        assertNull(preparedStatement.resultSet)
+    }
+
+    @Test
+    fun executeBatchClosesPreviousResultSet() {
+        whenever(database.query(any<String>(), any<Array<Any?>>())) doReturn cursor
+        preparedStatement.executeQuery()
+        assertTrue(preparedStatement.executeBatch().isEmpty())
+        verify(cursor).close()
+        assertNull(preparedStatement.resultSet)
+    }
+
+    @Test
+    fun connectionRefusesToPoolStatementWithOpenResultSet() {
+        whenever(database.query(any<String>(), any<Array<Any?>>())) doReturn cursor
+        preparedStatement.executeQuery()
+        assertFalse(connection.returnPreparedStatement(preparedStatement))
+        assertFalse(preparedStatement.isClosed)
+    }
+
+    @Test
+    fun pooledStatementIsReusedOnlyAfterItsResultSetIsClosed() {
+        whenever(database.query(any<String>(), any<Array<Any?>>())) doReturn cursor
+        preparedStatement.executeQuery()
+        preparedStatement.close()
+        val reused = connection.prepareStatement(preparedStatement.sql)
+        verify(cursor).close()
+        assertSame(preparedStatement, reused)
+        assertFalse(reused.isClosed)
     }
 
     @Test
