@@ -19,7 +19,6 @@ package com.bloomberg.selekt.jdbc.connection
 import com.bloomberg.selekt.SQLDatabase
 import com.bloomberg.selekt.SQLDatabaseSession
 import com.bloomberg.selekt.SQLitePragma
-import com.bloomberg.selekt.jdbc.driver.SharedDatabase
 import com.bloomberg.selekt.jdbc.statement.JdbcPreparedStatement
 import com.bloomberg.selekt.jdbc.statement.JdbcStatement
 import com.bloomberg.selekt.jdbc.util.ConnectionURL
@@ -64,7 +63,7 @@ internal class JdbcConnectionTest {
         mockDatabase = mock()
         connectionURL = ConnectionURL.parse("jdbc:sqlite:/tmp/test.db")
         properties = Properties()
-        connection = JdbcConnection(SharedDatabase(mockDatabase), connectionURL, properties)
+        connection = JdbcConnection(testSharedDatabase(mockDatabase), connectionURL, properties)
     }
 
     @Test
@@ -829,7 +828,7 @@ internal class JdbcConnectionTest {
             whenever(it.inTransaction) doReturn true
             whenever(it.setTransactionSuccessful()) doThrow RuntimeException("Database error")
         }
-        JdbcConnection(SharedDatabase(database), connectionURL, properties).run {
+        JdbcConnection(testSharedDatabase(database), connectionURL, properties).run {
             autoCommit = false
             assertFailsWith<SQLException> {
                 autoCommit = true
@@ -843,7 +842,7 @@ internal class JdbcConnectionTest {
             whenever(it.inTransaction) doReturn true
             whenever(it.endTransaction()) doThrow RuntimeException("End transaction failed")
         }
-        JdbcConnection(SharedDatabase(database), connectionURL, properties).run {
+        JdbcConnection(testSharedDatabase(database), connectionURL, properties).run {
             autoCommit = false
             assertFailsWith<SQLException> {
                 autoCommit = true
@@ -857,7 +856,7 @@ internal class JdbcConnectionTest {
             whenever(it.inTransaction) doReturn true
             whenever(it.setTransactionSuccessful()) doThrow RuntimeException("Commit failed")
         }
-        JdbcConnection(SharedDatabase(database), connectionURL, properties).run {
+        JdbcConnection(testSharedDatabase(database), connectionURL, properties).run {
             autoCommit = false
             assertFailsWith<SQLException> {
                 commit()
@@ -871,7 +870,7 @@ internal class JdbcConnectionTest {
             whenever(it.inTransaction) doReturn true
             whenever(it.endTransaction()) doThrow RuntimeException("Rollback failed")
         }
-        JdbcConnection(SharedDatabase(database), connectionURL, properties).run {
+        JdbcConnection(testSharedDatabase(database), connectionURL, properties).run {
             autoCommit = false
             assertFailsWith<SQLException> {
                 rollback()
@@ -884,7 +883,7 @@ internal class JdbcConnectionTest {
         val database = mock<SQLDatabase> {
             whenever(it.rollbackToSavepoint("test_sp")) doThrow RuntimeException("Savepoint rollback failed")
         }
-        JdbcConnection(SharedDatabase(database), connectionURL, properties).run {
+        JdbcConnection(testSharedDatabase(database), connectionURL, properties).run {
             autoCommit = false
             val savepoint = mock<Savepoint> {
                 whenever(it.savepointName) doReturn "test_sp"
@@ -899,7 +898,7 @@ internal class JdbcConnectionTest {
     fun setSavepointErrorHandling() {
         val database = mock<SQLDatabase>()
         whenever(database.setSavepoint("test_savepoint")) doThrow RuntimeException("Savepoint creation failed")
-        JdbcConnection(SharedDatabase(database), connectionURL, properties).run {
+        JdbcConnection(testSharedDatabase(database), connectionURL, properties).run {
             autoCommit = false
             assertFailsWith<SQLException> {
                 setSavepoint("test_savepoint")
@@ -919,7 +918,7 @@ internal class JdbcConnectionTest {
         val database = mock<SQLDatabase> {
             whenever(it.releaseSavepoint("test_sp")) doThrow RuntimeException("Release failed")
         }
-        JdbcConnection(SharedDatabase(database), connectionURL, properties).run {
+        JdbcConnection(testSharedDatabase(database), connectionURL, properties).run {
             val savepoint = mock<Savepoint> {
                 whenever(it.savepointName) doReturn "test_sp"
             }
@@ -935,7 +934,7 @@ internal class JdbcConnectionTest {
             whenever(it.inTransaction) doReturn true
             whenever(it.endTransaction()) doThrow RuntimeException("Transaction end failed")
         }
-        JdbcConnection(SharedDatabase(database), connectionURL, properties).run {
+        JdbcConnection(testSharedDatabase(database), connectionURL, properties).run {
             close()
             assertTrue(isClosed)
         }
@@ -947,7 +946,7 @@ internal class JdbcConnectionTest {
             whenever(it.exec("PRAGMA foreign_keys = 1")) doThrow RuntimeException("PRAGMA failed")
         }
         assertFailsWith<SQLException> {
-            JdbcConnection(SharedDatabase(database), connectionURL, properties)
+            JdbcConnection(testSharedDatabase(database), connectionURL, properties)
         }
     }
 
@@ -956,7 +955,7 @@ internal class JdbcConnectionTest {
         val transactionDatabase = mock<SQLDatabase> {
             whenever(it.inTransaction) doReturn false
         }
-        JdbcConnection(SharedDatabase(transactionDatabase), connectionURL, properties).apply {
+        JdbcConnection(testSharedDatabase(transactionDatabase), connectionURL, properties).apply {
             autoCommit = false
             ensureTransaction()
         }
@@ -968,7 +967,7 @@ internal class JdbcConnectionTest {
         val database = mock<SQLDatabase> {
             whenever(it.inTransaction) doReturn true
         }
-        JdbcConnection(SharedDatabase(database), connectionURL, properties).run {
+        JdbcConnection(testSharedDatabase(database), connectionURL, properties).run {
             autoCommit = false
             ensureTransaction()
         }
@@ -980,7 +979,7 @@ internal class JdbcConnectionTest {
         val database = mock<SQLDatabase> {
             whenever(it.inTransaction) doReturn false
         }
-        JdbcConnection(SharedDatabase(database), connectionURL, properties).apply {
+        JdbcConnection(testSharedDatabase(database), connectionURL, properties).apply {
             autoCommit = true
             ensureTransaction()
         }
@@ -992,7 +991,7 @@ internal class JdbcConnectionTest {
         val database = mock<SQLDatabase> {
             whenever(it.inTransaction) doReturn true
         }
-        JdbcConnection(SharedDatabase(database), connectionURL, properties).apply {
+        JdbcConnection(testSharedDatabase(database), connectionURL, properties).apply {
             isReadOnly = true
             autoCommit = false
             ensureTransaction()
@@ -1006,7 +1005,7 @@ internal class JdbcConnectionTest {
         val database = mock<SQLDatabase> {
             whenever(it.inTransaction) doReturn false
         }
-        JdbcConnection(SharedDatabase(database), connectionURL, properties).apply {
+        JdbcConnection(testSharedDatabase(database), connectionURL, properties).apply {
             isReadOnly = true
             autoCommit = true
             ensureTransaction()
@@ -1020,7 +1019,7 @@ internal class JdbcConnectionTest {
         val database = mock<SQLDatabase> {
             whenever(it.inTransaction) doReturn false
         }
-        JdbcConnection(SharedDatabase(database), connectionURL, properties).apply {
+        JdbcConnection(testSharedDatabase(database), connectionURL, properties).apply {
             isReadOnly = false
             autoCommit = false
             ensureTransaction()
@@ -1035,7 +1034,7 @@ internal class JdbcConnectionTest {
             whenever(it.inTransaction) doReturn true
             whenever(it.endTransaction()) doThrow RuntimeException("End transaction failed")
         }
-        JdbcConnection(SharedDatabase(database), connectionURL, properties).run {
+        JdbcConnection(testSharedDatabase(database), connectionURL, properties).run {
             autoCommit = false
             assertFailsWith<SQLException> {
                 commit()
@@ -1046,7 +1045,7 @@ internal class JdbcConnectionTest {
     @Test
     fun foreignKeysDisabled() {
         mock<SQLDatabase>().run {
-            JdbcConnection(SharedDatabase(this), connectionURL, Properties().apply {
+            JdbcConnection(testSharedDatabase(this), connectionURL, Properties().apply {
                 setProperty("foreignKeys", "false")
             })
             verify(this).exec("PRAGMA foreign_keys = 0")
@@ -1059,7 +1058,7 @@ internal class JdbcConnectionTest {
             whenever(it.inTransaction) doReturn true
             whenever(it.setTransactionSuccessful()) doThrow SQLException("SQL error")
         }
-        JdbcConnection(SharedDatabase(database), connectionURL, properties).run {
+        JdbcConnection(testSharedDatabase(database), connectionURL, properties).run {
             autoCommit = false
             val exception = assertFailsWith<SQLException> {
                 autoCommit = true
@@ -1074,7 +1073,7 @@ internal class JdbcConnectionTest {
             whenever(it.inTransaction) doReturn true
             whenever(it.setTransactionSuccessful()) doThrow SQLException("Commit SQL error")
         }
-        JdbcConnection(SharedDatabase(database), connectionURL, properties).run {
+        JdbcConnection(testSharedDatabase(database), connectionURL, properties).run {
             autoCommit = false
             val exception = assertFailsWith<SQLException> {
                 commit()
@@ -1089,7 +1088,7 @@ internal class JdbcConnectionTest {
             whenever(it.inTransaction) doReturn true
             whenever(it.endTransaction()) doThrow SQLException("Rollback SQL error")
         }
-        JdbcConnection(SharedDatabase(database), connectionURL, properties).run {
+        JdbcConnection(testSharedDatabase(database), connectionURL, properties).run {
             autoCommit = false
             val exception = assertFailsWith<SQLException> {
                 rollback()
@@ -1103,7 +1102,7 @@ internal class JdbcConnectionTest {
         val database = mock<SQLDatabase> {
             whenever(it.setSavepoint("test_savepoint")) doThrow SQLException("Savepoint SQL error")
         }
-        JdbcConnection(SharedDatabase(database), connectionURL, properties).run {
+        JdbcConnection(testSharedDatabase(database), connectionURL, properties).run {
             autoCommit = false
             val exception = assertFailsWith<SQLException> {
                 setSavepoint("test_savepoint")
@@ -1120,7 +1119,7 @@ internal class JdbcConnectionTest {
         val database = mock<SQLDatabase> {
             whenever(it.releaseSavepoint("test_sp")) doThrow SQLException("Release SQL error")
         }
-        JdbcConnection(SharedDatabase(database), connectionURL, properties).run {
+        JdbcConnection(testSharedDatabase(database), connectionURL, properties).run {
             val exception = assertFailsWith<SQLException> {
                 releaseSavepoint(savepoint)
             }
@@ -1173,7 +1172,7 @@ internal class JdbcConnectionTest {
         val database = mock<SQLDatabase> {
             whenever(it.rollbackToSavepoint("test_sp")) doThrow SQLException("Rollback to savepoint failed")
         }
-        JdbcConnection(SharedDatabase(database), connectionURL, properties).run {
+        JdbcConnection(testSharedDatabase(database), connectionURL, properties).run {
             val exception = assertFailsWith<SQLException> {
                 rollback(savepoint)
             }
@@ -1189,7 +1188,7 @@ internal class JdbcConnectionTest {
         val database = mock<SQLDatabase> {
             whenever(it.releaseSavepoint("test_sp")) doThrow SQLException("Release failed", "HY000", 999)
         }
-        JdbcConnection(SharedDatabase(database), connectionURL, properties).run {
+        JdbcConnection(testSharedDatabase(database), connectionURL, properties).run {
             val exception = assertFailsWith<SQLException> {
                 releaseSavepoint(savepoint)
             }
@@ -1205,7 +1204,7 @@ internal class JdbcConnectionTest {
         val database = mock<SQLDatabase> {
             whenever(it.rollbackToSavepoint("test_sp")) doThrow RuntimeException("Rollback runtime error")
         }
-        JdbcConnection(SharedDatabase(database), connectionURL, properties).run {
+        JdbcConnection(testSharedDatabase(database), connectionURL, properties).run {
             val exception = assertFailsWith<SQLException> {
                 rollback(savepoint)
             }
@@ -1219,7 +1218,7 @@ internal class JdbcConnectionTest {
             whenever(it.exec("PRAGMA foreign_keys = 1")) doThrow SQLException("PRAGMA failed", "HY000", 100)
         }
         assertFailsWith<SQLException> {
-            JdbcConnection(SharedDatabase(database), connectionURL, properties)
+            JdbcConnection(testSharedDatabase(database), connectionURL, properties)
         }
     }
 
@@ -1231,7 +1230,7 @@ internal class JdbcConnectionTest {
         val database = mock<SQLDatabase> {
             whenever(it.rollbackToSavepoint("test_sp")) doThrow SQLException(null, "HY000", 100)
         }
-        JdbcConnection(SharedDatabase(database), connectionURL, properties).run {
+        JdbcConnection(testSharedDatabase(database), connectionURL, properties).run {
             val exception = assertFailsWith<SQLException> {
                 rollback(savepoint)
             }
@@ -1248,7 +1247,7 @@ internal class JdbcConnectionTest {
         val database = mock<SQLDatabase> {
             whenever(it.rollbackToSavepoint("test_sp")) doThrow customException
         }
-        JdbcConnection(SharedDatabase(database), connectionURL, properties).run {
+        JdbcConnection(testSharedDatabase(database), connectionURL, properties).run {
             val exception = assertFailsWith<SQLException> {
                 rollback(savepoint)
             }
@@ -1264,7 +1263,7 @@ internal class JdbcConnectionTest {
         val database = mock<SQLDatabase> {
             whenever(it.rollbackToSavepoint("test_sp")) doThrow SQLException("")
         }
-        JdbcConnection(SharedDatabase(database), connectionURL, properties).run {
+        JdbcConnection(testSharedDatabase(database), connectionURL, properties).run {
             assertFailsWith<SQLException> {
                 rollback(savepoint)
             }
@@ -1279,7 +1278,7 @@ internal class JdbcConnectionTest {
         val database = mock<SQLDatabase> {
             whenever(it.rollbackToSavepoint("test_sp")) doThrow RuntimeException("")
         }
-        JdbcConnection(SharedDatabase(database), connectionURL, properties).run {
+        JdbcConnection(testSharedDatabase(database), connectionURL, properties).run {
             assertFailsWith<SQLException> {
                 rollback(savepoint)
             }
@@ -1383,7 +1382,7 @@ internal class JdbcConnectionTest {
     @Test
     fun preparedStatementPoolSurvivesConcurrentReturnsAndClose() {
         repeat(8) {
-            val freshConnection = JdbcConnection(SharedDatabase(mock()), connectionURL, properties)
+            val freshConnection = JdbcConnection(testSharedDatabase(mock()), connectionURL, properties)
             val statements = (0 until 64).map { i ->
                 freshConnection.prepareStatement("SELECT $i") as JdbcPreparedStatement
             }
@@ -1412,7 +1411,7 @@ internal class JdbcConnectionTest {
         val database = mock<SQLDatabase> {
             whenever(it.inTransaction) doReturn false
         }
-        JdbcConnection(SharedDatabase(database), connectionURL, properties).use {
+        JdbcConnection(testSharedDatabase(database), connectionURL, properties).use {
             it.isReadOnly = true
             it.autoCommit = false
             it.ensureTransaction()
