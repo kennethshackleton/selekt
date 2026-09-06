@@ -48,6 +48,15 @@ private inline fun MemorySegment.getConfinedString(): String = address().let {
     if (it == 0L) { "" } else { NATIVE_READER.getString(it) }
 }
 
+internal inline fun <T> MemorySegment.useSQLiteAllocation(
+    free: (MemorySegment) -> Unit,
+    block: MemorySegment.() -> T
+): T = try {
+    block()
+} finally {
+    free(this)
+}
+
 @Suppress("Detekt.LongParameterList", "Detekt.TooManyFunctions")
 internal class ExternalSQLite(
     configuration: SQLiteConfiguration,
@@ -753,7 +762,9 @@ internal class ExternalSQLite(
     override fun expandedSql(
         statement: Long
     ): String = (sqlite3_expanded_sql.invoke(MemorySegment.ofAddress(statement)) as MemorySegment)
-        .run(MemorySegment::getConfinedString)
+        .useSQLiteAllocation(free = sqlite3_free::invoke) {
+            getConfinedString()
+        }
 
     override fun extendedErrorCode(
         db: Long
@@ -1385,6 +1396,11 @@ internal class ExternalSQLite(
         private val sqlite3_finalize: MethodHandle = linker.downcallHandle(
             symbolLookup.find("sqlite3_finalize").orElseThrow(),
             FunctionDescriptor.of(JAVA_INT, ADDRESS)
+        )
+        private val sqlite3_free: MethodHandle = linker.downcallHandle(
+            symbolLookup.find("sqlite3_free").orElseThrow(),
+            FunctionDescriptor.ofVoid(ADDRESS),
+            criticalNoHeapOption
         )
         private val sqlite3_get_autocommit: MethodHandle = linker.downcallHandle(
             symbolLookup.find("sqlite3_get_autocommit").orElseThrow(),
