@@ -1,6 +1,12 @@
 Change Log
 ==========
 
+## Version 1.1.1
+
+* Optimise empty strings in native cursor window.
+* Avoid duplicate cursor lookups for text streams.
+* Enforce transaction isolation per JDBC connection.
+
 ## Version 1.1.0
 
 * Zero JDBC key bytes on encoding failure, support encryption via JDBC data source only.
