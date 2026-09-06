@@ -21,8 +21,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import javax.annotation.concurrent.NotThreadSafe
 
 /**
- * An explicitly owned database session. Operations and transaction state remain bound to this session when it is
- * handed between threads sequentially; concurrent access is not supported.
+ * An explicitly owned database session. Operations and transaction state remain bound to this session.
  *
  * Closing a session rolls back any active transaction before releasing its database reference.
  *
@@ -31,8 +30,7 @@ import javax.annotation.concurrent.NotThreadSafe
 @NotThreadSafe
 class SQLDatabaseSession internal constructor(
     private val database: SQLDatabase,
-    internal val session: SQLSession,
-    private val beforeSessionAccess: () -> Unit
+    internal val session: SQLSession
 ) : Closeable {
     private val closed = AtomicBoolean(false)
 
@@ -46,14 +44,12 @@ class SQLDatabaseSession internal constructor(
     @JvmSynthetic
     fun <T> execute(block: SQLDatabase.() -> T): T {
         check(!closed.get()) { "Database session is closed." }
-        beforeSessionAccess()
         return database.withSession(session, block)
     }
 
     override fun close() {
         if (closed.compareAndSet(false, true)) {
             try {
-                beforeSessionAccess()
                 database.withSession(session) {
                     if (session.inTransaction) {
                         session.endTransaction()
