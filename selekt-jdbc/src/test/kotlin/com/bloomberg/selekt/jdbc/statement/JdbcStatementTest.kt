@@ -20,7 +20,7 @@ import com.bloomberg.selekt.ICursor
 import com.bloomberg.selekt.ISQLStatement
 import com.bloomberg.selekt.SQLDatabase
 import com.bloomberg.selekt.jdbc.connection.JdbcConnection
-import com.bloomberg.selekt.jdbc.driver.SharedDatabase
+import com.bloomberg.selekt.jdbc.connection.testSharedDatabase
 import com.bloomberg.selekt.jdbc.result.JdbcResultSet
 import com.bloomberg.selekt.jdbc.util.ConnectionURL
 import java.sql.ResultSet
@@ -67,7 +67,7 @@ internal class JdbcStatementTest {
         mockCursor = mock<ICursor>()
         val connectionURL = ConnectionURL.parse("jdbc:sqlite:/tmp/test.db")
         val properties = Properties()
-        mockConnection = JdbcConnection(SharedDatabase(mockDatabase), connectionURL, properties)
+        mockConnection = JdbcConnection(testSharedDatabase(mockDatabase), connectionURL, properties)
         statement = JdbcStatement(mockConnection, mockDatabase)
     }
 

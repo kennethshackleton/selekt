@@ -20,7 +20,7 @@ import com.bloomberg.selekt.ColumnType
 import com.bloomberg.selekt.ICursor
 import com.bloomberg.selekt.SQLDatabase
 import com.bloomberg.selekt.jdbc.connection.JdbcConnection
-import com.bloomberg.selekt.jdbc.driver.SharedDatabase
+import com.bloomberg.selekt.jdbc.connection.testSharedDatabase
 import com.bloomberg.selekt.jdbc.util.ConnectionURL
 import java.sql.Connection
 import java.sql.DatabaseMetaData
@@ -62,7 +62,7 @@ internal class JdbcDatabaseMetaDataTest {
             whenever(it.query(any<String>(), any<Array<Any?>>())).doReturn(mockCursor)
         }
         val connectionURL = ConnectionURL.parse("jdbc:sqlite:/tmp/test.db")
-        mockConnection = JdbcConnection(SharedDatabase(mockDatabase), connectionURL, Properties())
+        mockConnection = JdbcConnection(testSharedDatabase(mockDatabase), connectionURL, Properties())
         metaData = JdbcDatabaseMetaData(mockConnection, mockDatabase, connectionURL)
     }
 

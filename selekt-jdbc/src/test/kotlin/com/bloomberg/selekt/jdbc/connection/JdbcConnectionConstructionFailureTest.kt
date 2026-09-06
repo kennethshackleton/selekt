@@ -17,7 +17,6 @@
 package com.bloomberg.selekt.jdbc.connection
 
 import com.bloomberg.selekt.SQLDatabase
-import com.bloomberg.selekt.jdbc.driver.SharedDatabase
 import com.bloomberg.selekt.jdbc.util.ConnectionURL
 import java.sql.SQLException
 import java.util.Properties
@@ -43,7 +42,7 @@ internal class JdbcConnectionConstructionFailureTest {
                 SQLException("simulated PRAGMA failure")
         }
         val releaseCount = AtomicInteger(0)
-        val shared = SharedDatabase(database, onClose = { releaseCount.incrementAndGet() })
+        val shared = testSharedDatabase(database, onClose = { releaseCount.incrementAndGet() })
         shared.retain()
         assertFailsWith<SQLException> {
             JdbcConnection(shared, url, Properties())
@@ -64,7 +63,7 @@ internal class JdbcConnectionConstructionFailureTest {
             whenever(it.exec(any<String>(), anyOrNull<Array<out Any?>>())).then { }
         }
         val releaseCount = AtomicInteger(0)
-        val shared = SharedDatabase(database, onClose = { releaseCount.incrementAndGet() })
+        val shared = testSharedDatabase(database, onClose = { releaseCount.incrementAndGet() })
         shared.retain()
         val connection = JdbcConnection(shared, url, Properties())
         assertTrue(shared.isOpen())

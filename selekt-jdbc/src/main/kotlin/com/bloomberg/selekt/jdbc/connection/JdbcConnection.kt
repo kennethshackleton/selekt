@@ -58,11 +58,10 @@ private const val MAX_POOLED_STATEMENTS = 32
  */
 @Suppress("MethodOverloading", "TooGenericExceptionCaught", "Detekt.StringLiteralDuplication")
 @NotThreadSafe
-internal class JdbcConnection private constructor(
+internal class JdbcConnection(
     private val sharedDatabase: SharedDatabase,
     private val connectionURL: ConnectionURL,
-    private val properties: Properties,
-    ownedSession: OwnedSession
+    private val properties: Properties
 ) : Connection {
     companion object {
         private val logger: Logger = LoggerFactory.getLogger(JdbcConnection::class.java)
@@ -72,30 +71,16 @@ internal class JdbcConnection private constructor(
             "closed",
             Boolean::class.javaPrimitiveType
         )
-
-        private fun openOwnedSession(sharedDatabase: SharedDatabase): OwnedSession {
-            val owner = Any()
-            return OwnedSession(
-                owner,
-                sharedDatabase.database.openSession(
-                    beforePrimaryConnectionAccess = { sharedDatabase.checkPrimaryConnectionAccess(owner) },
-                    onTransactionStateChanged = { inTransaction ->
-                        sharedDatabase.synchronizeTransaction(owner, inTransaction)
-                    }
-                )
-            )
-        }
     }
 
-    private data class OwnedSession(
-        val owner: Any,
-        val databaseSession: SQLDatabaseSession?
-    )
-
-    private val sessionOwner = ownedSession.owner
-    private val databaseSession = ownedSession.databaseSession
-
+    private val sessionOwner = Any()
     private val database: SQLDatabase get() = sharedDatabase.database
+    private val databaseSession: SQLDatabaseSession = database.openSession(
+        beforePrimaryConnectionAccess = { sharedDatabase.checkPrimaryConnectionAccess(sessionOwner) },
+        onTransactionStateChanged = { inTransaction ->
+            sharedDatabase.synchronizeTransaction(sessionOwner, inTransaction)
+        }
+    )
 
     @Volatile
     private var closed = false
@@ -115,16 +100,10 @@ internal class JdbcConnection private constructor(
         try {
             applyConnectionProperties()
         } catch (e: Exception) {
-            databaseSession?.close()
+            databaseSession.close()
             throw e
         }
     }
-
-    internal constructor(
-        sharedDatabase: SharedDatabase,
-        connectionURL: ConnectionURL,
-        properties: Properties
-    ) : this(sharedDatabase, connectionURL, properties, openOwnedSession(sharedDatabase))
 
     override fun createStatement(): Statement = createStatement(
         ResultSet.TYPE_FORWARD_ONLY,
@@ -377,10 +356,8 @@ internal class JdbcConnection private constructor(
             try {
                 closePreparedStatementPool()
             } finally {
-                databaseSession?.run {
-                    runCatching(::close).onFailure { e ->
-                        logger.debug("Error rolling back database session on connection close: {}", e.message)
-                    }
+                runCatching(databaseSession::close).onFailure { e ->
+                    logger.debug("Error rolling back database session on connection close: {}", e.message)
                 }
                 sharedDatabase.releaseTransaction(sessionOwner)
                 sharedDatabase.runCatching {
@@ -594,15 +571,7 @@ internal class JdbcConnection private constructor(
     internal fun <T> withSession(block: SQLDatabase.() -> T): T {
         checkClosed()
         sharedDatabase.checkTransactionThread(sessionOwner)
-        // This deliberately examines the current thread's selected session before installing ours. It prevents a JDBC
-        // call from hiding an ambient or re-entrant transaction; ThreadLocalSession cannot observe another thread here.
-        if (databaseSession != null && !databaseSession.isActiveOnCurrentThread && database.inTransaction) {
-            throw SQLException(
-                "The current thread has a SQLDatabase transaction outside this JDBC connection's session"
-            )
-        }
-        val session = databaseSession ?: return block(database)
-        return session.execute(block)
+        return databaseSession.execute(block)
     }
 
     internal fun checkWritable() {
