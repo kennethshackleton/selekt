@@ -833,14 +833,11 @@ internal class JdbcDatabaseMetaData(
     override fun <T> unwrap(iface: Class<T>): T = if (iface.isAssignableFrom(this::class.java)) {
         @Suppress("UNCHECKED_CAST")
         this as T
-    } else if (iface.isAssignableFrom(SQLDatabase::class.java)) {
-        @Suppress("UNCHECKED_CAST")
-        database as T
     } else {
         throw SQLException("Cannot unwrap to ${iface.name}")
     }
 
     override fun isWrapperFor(
         iface: Class<*>
-    ): Boolean = iface.isAssignableFrom(this::class.java) || iface.isAssignableFrom(SQLDatabase::class.java)
+    ): Boolean = iface.isAssignableFrom(this::class.java)
 }

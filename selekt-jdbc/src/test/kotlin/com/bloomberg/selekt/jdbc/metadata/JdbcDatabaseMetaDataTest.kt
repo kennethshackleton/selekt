@@ -449,14 +449,13 @@ internal class JdbcDatabaseMetaDataTest {
     }
 
     @Test
-    fun unwrapToSQLDatabase() {
-        val unwrapped = metaData.unwrap(SQLDatabase::class.java)
-        assertSame(mockDatabase, unwrapped)
+    fun cannotUnwrapToSQLDatabase() {
+        assertFailsWith<SQLException> { metaData.unwrap(SQLDatabase::class.java) }
     }
 
     @Test
-    fun isWrapperForSQLDatabase() {
-        assertTrue(metaData.isWrapperFor(SQLDatabase::class.java))
+    fun isNotWrapperForSQLDatabase() {
+        assertFalse(metaData.isWrapperFor(SQLDatabase::class.java))
     }
 
     @Test

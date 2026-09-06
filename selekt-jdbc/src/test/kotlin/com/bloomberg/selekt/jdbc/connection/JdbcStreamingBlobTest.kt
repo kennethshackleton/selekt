@@ -16,7 +16,6 @@
 
 package com.bloomberg.selekt.jdbc.connection
 
-import com.bloomberg.selekt.SQLDatabase
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.ByteArrayInputStream
@@ -55,13 +54,15 @@ internal class JdbcStreamingBlobTest {
                 }
             }
 
-            val database = connection.unwrap(SQLDatabase::class.java)
-            ByteArrayInputStream(payload).use { database.writeToBlob("files", "data", rowId, 0, it) }
-
-            assertEquals(payload.size, database.sizeOfBlob("files", "data", rowId))
-
-            val roundTripped = ByteArrayOutputStream(payload.size).also {
-                database.readFromBlob("files", "data", rowId, 0, payload.size, it)
+            val jdbcConnection = connection as JdbcConnection
+            jdbcConnection.withSession {
+                ByteArrayInputStream(payload).use { writeToBlob("files", "data", rowId, 0, it) }
+            }
+            assertEquals(payload.size, jdbcConnection.withSession { sizeOfBlob("files", "data", rowId) })
+            val roundTripped = ByteArrayOutputStream(payload.size).also { output ->
+                jdbcConnection.withSession {
+                    readFromBlob("files", "data", rowId, 0, payload.size, output)
+                }
             }.toByteArray()
             assertTrue(payload.contentEquals(roundTripped), "Streamed blob should round-trip exactly")
         }
@@ -76,8 +77,9 @@ internal class JdbcStreamingBlobTest {
                 it.executeUpdate("CREATE TABLE files (id INTEGER PRIMARY KEY, data BLOB NOT NULL)")
                 it.executeUpdate("INSERT INTO files (data) VALUES (zeroblob(1024))")
             }
-            val database = connection.unwrap(SQLDatabase::class.java)
-            assertEquals(1024, database.sizeOfBlob("files", "data", 1L))
+            assertEquals(1024, (connection as JdbcConnection).withSession {
+                sizeOfBlob("files", "data", 1L)
+            })
         }
     }
 }

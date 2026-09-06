@@ -16,7 +16,6 @@
 
 package com.bloomberg.selekt.jdbc.connection
 
-import com.bloomberg.selekt.SQLDatabaseSession
 import com.bloomberg.selekt.SQLTransactionListener
 import java.nio.file.Files
 import java.sql.Connection
@@ -194,7 +193,7 @@ internal class JdbcTransactionOwnershipTest {
     }
 
     @Test
-    fun transactionStartedThroughUnwrappedSessionIsConnectionOwned() = assertTimeoutPreemptively(
+    fun transactionStartedThroughInternalSessionIsConnectionOwned() = assertTimeoutPreemptively(
         Duration.ofSeconds(5)
     ) {
         val url = newDatabaseUrl("unwrapped-session")
@@ -202,8 +201,8 @@ internal class JdbcTransactionOwnershipTest {
         DriverManager.getConnection(url).use { first ->
             DriverManager.getConnection(url).use { second ->
                 first.autoCommit = false
-                val session = first.unwrap(SQLDatabaseSession::class.java)
-                session.execute {
+                val jdbcConnection = first as JdbcConnection
+                jdbcConnection.withSession {
                     beginImmediateTransaction()
                     exec("INSERT INTO test(value) VALUES ('first')")
                 }
@@ -230,8 +229,8 @@ internal class JdbcTransactionOwnershipTest {
         createSchema(url)
         DriverManager.getConnection(url).use { first ->
             DriverManager.getConnection(url).use { second ->
-                val session = first.unwrap(SQLDatabaseSession::class.java)
-                session.execute {
+                val jdbcConnection = first as JdbcConnection
+                jdbcConnection.withSession {
                     beginImmediateTransactionWithListener(object : SQLTransactionListener {
                         override fun onBegin() = assertOwnedByAnotherConnection {
                             second.createStatement().use {
@@ -244,7 +243,7 @@ internal class JdbcTransactionOwnershipTest {
                         override fun onRollback() = Unit
                     })
                 }
-                session.execute { endTransaction() }
+                jdbcConnection.withSession { endTransaction() }
                 second.createStatement().use {
                     assertEquals(1, it.executeUpdate("INSERT INTO test(value) VALUES ('after-rollback')"))
                 }
@@ -257,8 +256,8 @@ internal class JdbcTransactionOwnershipTest {
         val url = newDatabaseUrl("listener-reentrant-owner")
         createSchema(url)
         DriverManager.getConnection(url).use { connection ->
-            val session = connection.unwrap(SQLDatabaseSession::class.java)
-            session.execute {
+            val jdbcConnection = connection as JdbcConnection
+            jdbcConnection.withSession {
                 beginImmediateTransactionWithListener(object : SQLTransactionListener {
                     override fun onBegin() {
                         connection.createStatement().use {
@@ -283,9 +282,9 @@ internal class JdbcTransactionOwnershipTest {
         createSchema(url)
         DriverManager.getConnection(url).use { first ->
             DriverManager.getConnection(url).use { second ->
-                val session = first.unwrap(SQLDatabaseSession::class.java)
+                val jdbcConnection = first as JdbcConnection
                 val failure = assertFailsWith<IllegalStateException> {
-                    session.execute {
+                    jdbcConnection.withSession {
                         beginImmediateTransactionWithListener(object : SQLTransactionListener {
                             override fun onBegin(): Unit = error("listener failed")
 
@@ -296,7 +295,7 @@ internal class JdbcTransactionOwnershipTest {
                     }
                 }
                 assertEquals("listener failed", failure.message)
-                session.execute { assertFalse(inTransaction) }
+                jdbcConnection.withSession { assertFalse(inTransaction) }
                 second.createStatement().use {
                     assertEquals(1, it.executeUpdate("INSERT INTO test(value) VALUES ('after-failure')"))
                 }
@@ -317,8 +316,8 @@ internal class JdbcTransactionOwnershipTest {
 
                     override fun onRollback() = assertSecondConnectionCannotWrite(second)
                 }
-                val session = first.unwrap(SQLDatabaseSession::class.java)
-                session.execute {
+                val jdbcConnection = first as JdbcConnection
+                jdbcConnection.withSession {
                     beginImmediateTransactionWithListener(listener)
                     setTransactionSuccessful()
                     endTransaction()

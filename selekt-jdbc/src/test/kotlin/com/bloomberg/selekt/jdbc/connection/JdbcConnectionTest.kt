@@ -17,6 +17,7 @@
 package com.bloomberg.selekt.jdbc.connection
 
 import com.bloomberg.selekt.SQLDatabase
+import com.bloomberg.selekt.SQLDatabaseSession
 import com.bloomberg.selekt.SQLitePragma
 import com.bloomberg.selekt.jdbc.driver.SharedDatabase
 import com.bloomberg.selekt.jdbc.statement.JdbcPreparedStatement
@@ -665,12 +666,11 @@ internal class JdbcConnectionTest {
     }
 
     @Test
-    fun unwrapToSQLDatabase(): Unit = connection.run {
-        assertTrue(isWrapperFor(SQLDatabase::class.java))
-        unwrap(SQLDatabase::class.java).let {
-            assertNotNull(it)
-            assertEquals(mockDatabase, it)
-        }
+    fun cannotUnwrapToLowLevelDatabaseCapabilities(): Unit = connection.run {
+        assertFalse(isWrapperFor(SQLDatabase::class.java))
+        assertFailsWith<SQLException> { unwrap(SQLDatabase::class.java) }
+        assertFalse(isWrapperFor(SQLDatabaseSession::class.java))
+        assertFailsWith<SQLException> { unwrap(SQLDatabaseSession::class.java) }
     }
 
     @Test

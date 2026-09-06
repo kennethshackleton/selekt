@@ -16,8 +16,8 @@
 
 package com.bloomberg.selekt.jdbc.transaction
 
-import com.bloomberg.selekt.SQLDatabaseSession
 import com.bloomberg.selekt.SQLTransactionListener
+import com.bloomberg.selekt.jdbc.connection.JdbcConnection
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
@@ -59,13 +59,13 @@ internal class JdbcTransactionListenerTest {
                 statement.executeUpdate("DROP TABLE IF EXISTS test")
                 statement.executeUpdate("CREATE TABLE test (id INTEGER PRIMARY KEY, value TEXT)")
             }
-            val database = connection.unwrap(SQLDatabaseSession::class.java)
+            val jdbcConnection = connection as JdbcConnection
             connection.autoCommit = false
-            database.execute { beginExclusiveTransactionWithListener(listener) }
+            jdbcConnection.withSession { beginExclusiveTransactionWithListener(listener) }
             connection.createStatement().use { statement ->
                 statement.executeUpdate("INSERT INTO test (value) VALUES ('test')")
             }
-            database.execute {
+            jdbcConnection.withSession {
                 setTransactionSuccessful()
                 endTransaction()
             }
@@ -88,13 +88,13 @@ internal class JdbcTransactionListenerTest {
                 it.executeUpdate("DROP TABLE IF EXISTS test2")
                 it.executeUpdate("CREATE TABLE test2 (id INTEGER PRIMARY KEY, value TEXT)")
             }
-            val database = connection.unwrap(SQLDatabaseSession::class.java)
+            val jdbcConnection = connection as JdbcConnection
             connection.autoCommit = false
-            database.execute { beginExclusiveTransactionWithListener(listener) }
+            jdbcConnection.withSession { beginExclusiveTransactionWithListener(listener) }
             connection.createStatement().use {
                 it.executeUpdate("INSERT INTO test2 (value) VALUES ('rollback-test')")
             }
-            database.execute { endTransaction() }
+            jdbcConnection.withSession { endTransaction() }
             assertEquals(1, listener.beginCount.get(), "onBegin should be called once")
             assertEquals(0, listener.commitCount.get(), "onCommit should not be called")
             assertEquals(1, listener.rollbackCount.get(), "onRollback should be called once via native hook")
@@ -114,12 +114,12 @@ internal class JdbcTransactionListenerTest {
                 statement.executeUpdate("DROP TABLE IF EXISTS test6")
                 statement.executeUpdate("CREATE TABLE test6 (id INTEGER PRIMARY KEY, value TEXT)")
             }
-            val database = connection.unwrap(SQLDatabaseSession::class.java)
-            database.execute { beginExclusiveTransactionWithListener(listener) }
+            val jdbcConnection = connection as JdbcConnection
+            jdbcConnection.withSession { beginExclusiveTransactionWithListener(listener) }
             connection.createStatement().use {
                 it.executeUpdate("INSERT INTO test6 (value) VALUES ('first')")
             }
-            database.execute {
+            jdbcConnection.withSession {
                 setTransactionSuccessful()
                 endTransaction()
                 beginExclusiveTransactionWithListener(listener)
@@ -127,14 +127,14 @@ internal class JdbcTransactionListenerTest {
             connection.createStatement().use {
                 it.executeUpdate("INSERT INTO test6 (value) VALUES ('second')")
             }
-            database.execute {
+            jdbcConnection.withSession {
                 endTransaction()
                 beginExclusiveTransactionWithListener(listener)
             }
             connection.createStatement().use {
                 it.executeUpdate("INSERT INTO test6 (value) VALUES ('third')")
             }
-            database.execute {
+            jdbcConnection.withSession {
                 setTransactionSuccessful()
                 endTransaction()
             }
@@ -157,16 +157,16 @@ internal class JdbcTransactionListenerTest {
                 statement.executeUpdate("DROP TABLE IF EXISTS test7")
                 statement.executeUpdate("CREATE TABLE test7 (id INTEGER PRIMARY KEY, value TEXT)")
             }
-            val database = connection.unwrap(SQLDatabaseSession::class.java)
-            database.execute { beginExclusiveTransactionWithListener(listener) }
+            val jdbcConnection = connection as JdbcConnection
+            jdbcConnection.withSession { beginExclusiveTransactionWithListener(listener) }
             connection.createStatement().use {
                 it.executeUpdate("INSERT INTO test7 (value) VALUES ('outer')")
             }
-            database.execute { beginExclusiveTransaction() }
+            jdbcConnection.withSession { beginExclusiveTransaction() }
             connection.createStatement().use {
                 it.executeUpdate("INSERT INTO test7 (value) VALUES ('inner')")
             }
-            database.execute {
+            jdbcConnection.withSession {
                 setTransactionSuccessful()
                 endTransaction()
                 setTransactionSuccessful()
@@ -196,19 +196,19 @@ internal class JdbcTransactionListenerTest {
                 it.executeUpdate("DROP TABLE IF EXISTS test8")
                 it.executeUpdate("CREATE TABLE test8 (id INTEGER PRIMARY KEY, value TEXT)")
             }
-            val database = connection.unwrap(SQLDatabaseSession::class.java)
-            database.execute {
+            val jdbcConnection = connection as JdbcConnection
+            jdbcConnection.withSession {
                 beginExclusiveTransactionWithListener(listener)
                 setTransactionSuccessful()
                 endTransaction()
             }
             assertEquals(1, listener.beginCount.get())
             assertEquals(1, listener.commitCount.get())
-            database.execute { beginExclusiveTransaction() }
+            jdbcConnection.withSession { beginExclusiveTransaction() }
             connection.createStatement().use {
                 it.executeUpdate("INSERT INTO test8 (value) VALUES ('no-listener')")
             }
-            database.execute {
+            jdbcConnection.withSession {
                 setTransactionSuccessful()
                 endTransaction()
             }
