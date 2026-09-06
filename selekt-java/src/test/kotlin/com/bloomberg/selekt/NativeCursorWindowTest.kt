@@ -29,6 +29,7 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.test.fail
 
@@ -232,7 +233,9 @@ internal class NativeCursorWindowTest {
     fun readsEmptyBlob() {
         NativeCursorWindow(cursorWindowBuffer(listOf(byteArrayOf())), fakeSQLite(), 1).use {
             assertEquals(ColumnType.BLOB, it.type(0, 0))
-            assertContentEquals(byteArrayOf(), it.getBlob(0, 0))
+            val emptyBytes = it.getBlob(0, 0)
+            assertContentEquals(byteArrayOf(), emptyBytes)
+            assertSame(emptyBytes, it.getBlob(0, 0))
         }
     }
 
@@ -240,7 +243,10 @@ internal class NativeCursorWindowTest {
     fun readsEmptyText() {
         NativeCursorWindow(cursorWindowBuffer(listOf("", 1L)), fakeSQLite(), 2).use {
             assertEquals(ColumnType.STRING, it.type(0, 0))
-            assertEquals("", it.getString(0, 0))
+            assertSame("", it.getString(0, 0))
+            val emptyBytes = it.getBlob(0, 0)
+            assertContentEquals(byteArrayOf(), emptyBytes)
+            assertSame(emptyBytes, it.getBlob(0, 0))
             assertEquals(1L, it.getLong(0, 1))
         }
     }
