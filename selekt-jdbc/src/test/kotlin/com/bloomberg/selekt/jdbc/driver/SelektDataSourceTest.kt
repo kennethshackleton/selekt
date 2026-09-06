@@ -361,6 +361,26 @@ internal class SelektDataSourceTest {
     }
 
     @Test
+    fun privateMemoryDatabaseForcesSingleConnectionPool(): Unit = dataSource.run {
+        databasePath = ":memory:"
+        maxPoolSize = 10
+        getConnection().use { connection ->
+            verifyPrivateMemoryRoundTrip(connection)
+        }
+    }
+
+    private fun verifyPrivateMemoryRoundTrip(connection: java.sql.Connection) {
+        connection.createStatement().use { statement ->
+            statement.executeUpdate("CREATE TABLE test(value INTEGER)")
+            statement.executeUpdate("INSERT INTO test VALUES (42)")
+            statement.executeQuery("SELECT value FROM test").use {
+                assertTrue(it.next())
+                assertEquals(42, it.getInt(1))
+            }
+        }
+    }
+
+    @Test
     fun getConnectionWithCustomBusyTimeout(): Unit = dataSource.run {
         databasePath = File(tempDir, "timeout.db").absolutePath
         busyTimeout = 5000
