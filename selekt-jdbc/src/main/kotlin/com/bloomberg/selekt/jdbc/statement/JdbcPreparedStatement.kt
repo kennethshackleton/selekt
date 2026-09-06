@@ -189,7 +189,9 @@ internal open class JdbcPreparedStatement(
             val signal = activateCancellationSignalOrNull()
             var signalHandedOff = false
             try {
-                val statement = database.compileStatement(sql, materializedArgs)
+                val statement = connection.withSession {
+                    database.compileStatement(sql, materializedArgs)
+                }
                 if (statement.isReadOnly) {
                     deactivateCancellationSignal()
                     signalHandedOff = true
@@ -278,12 +280,13 @@ internal open class JdbcPreparedStatement(
             return IntArray(0)
         }
         try {
-            if (database.compileStatement(sql).isReadOnly) {
+            if (connection.withSession { database.compileStatement(sql).use { it.isReadOnly } }) {
                 throw SQLException("Read-only statements are not allowed in batch execution")
             }
             val signal = activateCancellationSignalOrNull()
             try {
                 withCancellation(signal, primary = true) {
+                    connection.ensureTransaction()
                     batchRows(sql, batchRows)
                 }
             } catch (e: OperationCancelledException) {

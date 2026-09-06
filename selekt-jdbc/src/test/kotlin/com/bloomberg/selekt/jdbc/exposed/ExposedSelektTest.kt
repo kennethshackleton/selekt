@@ -17,6 +17,7 @@
 package com.bloomberg.selekt.jdbc.exposed
 
 import org.jetbrains.exposed.sql.Database
+import org.jetbrains.exposed.sql.DatabaseConfig
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
@@ -34,6 +35,7 @@ import java.sql.Connection
 import java.sql.DriverManager
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -58,10 +60,15 @@ internal class ExposedSelektTest {
     @TempDir
     lateinit var tempDir: File
 
-    private fun connect(): Database {
+    private fun connect(useNestedTransactions: Boolean = false): Database {
         val databaseFile = File(tempDir, "test_${counter.incrementAndGet()}.db")
         val url = "jdbc:sqlite:${databaseFile.absolutePath}"
-        return Database.connect({ DriverManager.getConnection(url) })
+        return Database.connect(
+            getNewConnection = { DriverManager.getConnection(url) },
+            databaseConfig = DatabaseConfig {
+                this.useNestedTransactions = useNestedTransactions
+            }
+        )
     }
 
     @Test
@@ -254,6 +261,34 @@ internal class ExposedSelektTest {
         }
         transaction(database) {
             assertEquals(2L, Users.selectAll().count())
+        }
+    }
+
+    @Test
+    fun nestedTransactionRollbackPreservesOuterTransaction() {
+        val database = connect(useNestedTransactions = true)
+        transaction(database) {
+            SchemaUtils.create(Users)
+            Users.insert {
+                it[name] = "Outer"
+                it[email] = null
+            }
+            assertFailsWith<IllegalStateException> {
+                transaction(database) {
+                    Users.insert {
+                        it[name] = "Inner"
+                        it[email] = null
+                    }
+                    error("Roll back nested transaction")
+                }
+            }
+            Users.insert {
+                it[name] = "After"
+                it[email] = null
+            }
+        }
+        transaction(database) {
+            assertEquals(listOf("After", "Outer"), Users.selectAll().map { it[Users.name] }.sorted())
         }
     }
 

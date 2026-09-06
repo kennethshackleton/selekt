@@ -17,6 +17,7 @@
 package com.bloomberg.selekt.jdbc.connection
 
 import com.bloomberg.selekt.SQLDatabase
+import com.bloomberg.selekt.SQLDatabaseSession
 import com.bloomberg.selekt.commons.forEachCatching
 import com.bloomberg.selekt.jdbc.driver.SharedDatabase
 import com.bloomberg.selekt.jdbc.exception.SQLExceptionMapper
@@ -25,6 +26,7 @@ import com.bloomberg.selekt.jdbc.metadata.JdbcDatabaseMetaData
 import com.bloomberg.selekt.jdbc.statement.JdbcPreparedStatement
 import com.bloomberg.selekt.jdbc.statement.JdbcStatement
 import com.bloomberg.selekt.jdbc.util.ConnectionURL
+import java.lang.invoke.MethodHandles
 import java.sql.Blob
 import java.sql.CallableStatement
 import java.sql.Clob
@@ -40,15 +42,14 @@ import java.sql.SQLXML
 import java.sql.Savepoint
 import java.sql.Statement
 import java.sql.Struct
-import java.lang.invoke.MethodHandles
 import java.util.Properties
 import java.util.concurrent.Executor
 import java.util.concurrent.locks.ReentrantLock
+import javax.annotation.concurrent.GuardedBy
 import javax.annotation.concurrent.NotThreadSafe
 import kotlin.concurrent.withLock
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import javax.annotation.concurrent.GuardedBy
 
 private const val MAX_POOLED_STATEMENTS = 32
 
@@ -57,10 +58,11 @@ private const val MAX_POOLED_STATEMENTS = 32
  */
 @Suppress("MethodOverloading", "TooGenericExceptionCaught", "Detekt.StringLiteralDuplication")
 @NotThreadSafe
-internal class JdbcConnection(
+internal class JdbcConnection private constructor(
     private val sharedDatabase: SharedDatabase,
     private val connectionURL: ConnectionURL,
-    private val properties: Properties
+    private val properties: Properties,
+    ownedSession: OwnedSession
 ) : Connection {
     companion object {
         private val logger: Logger = LoggerFactory.getLogger(JdbcConnection::class.java)
@@ -70,7 +72,29 @@ internal class JdbcConnection(
             "closed",
             Boolean::class.javaPrimitiveType
         )
+
+        private fun openOwnedSession(sharedDatabase: SharedDatabase): OwnedSession {
+            val owner = Any()
+            return OwnedSession(
+                owner,
+                sharedDatabase.database.openSession(
+                    beforeSessionAccess = { sharedDatabase.enterSession(owner) },
+                    beforePrimaryConnectionAccess = { sharedDatabase.checkPrimaryConnectionAccess(owner) },
+                    onTransactionStateChanged = { inTransaction ->
+                        sharedDatabase.synchronizeTransaction(owner, inTransaction)
+                    }
+                )
+            )
+        }
     }
+
+    private data class OwnedSession(
+        val owner: Any,
+        val databaseSession: SQLDatabaseSession?
+    )
+
+    private val sessionOwner = ownedSession.owner
+    private val databaseSession = ownedSession.databaseSession
 
     private val database: SQLDatabase get() = sharedDatabase.database
 
@@ -89,8 +113,19 @@ internal class JdbcConnection(
     private val _metaData by lazy { JdbcDatabaseMetaData(this, database, connectionURL) }
 
     init {
-        applyConnectionProperties()
+        try {
+            applyConnectionProperties()
+        } catch (e: Exception) {
+            databaseSession?.close()
+            throw e
+        }
     }
+
+    internal constructor(
+        sharedDatabase: SharedDatabase,
+        connectionURL: ConnectionURL,
+        properties: Properties
+    ) : this(sharedDatabase, connectionURL, properties, openOwnedSession(sharedDatabase))
 
     override fun createStatement(): Statement = createStatement(
         ResultSet.TYPE_FORWARD_ONLY,
@@ -229,12 +264,14 @@ internal class JdbcConnection(
         if (this.autoCommit == autoCommit) {
             return
         }
-        database.runCatching {
-            if (autoCommit && inTransaction) {
-                setTransactionSuccessful()
-                endTransaction()
+        runCatching {
+            withSession {
+                if (autoCommit && inTransaction) {
+                    setTransactionSuccessful()
+                    endTransaction()
+                }
+                this@JdbcConnection.autoCommit = autoCommit
             }
-            this@JdbcConnection.autoCommit = autoCommit
         }.onFailure { e ->
             throw SQLExceptionMapper.mapException(e as? SQLException ?: SQLException(e.message, e))
         }
@@ -247,10 +284,12 @@ internal class JdbcConnection(
         if (autoCommit) {
             throw SQLException("Cannot call commit() while in auto-commit mode")
         }
-        database.runCatching {
-            if (inTransaction) {
-                setTransactionSuccessful()
-                endTransaction()
+        runCatching {
+            withSession {
+                if (inTransaction) {
+                    setTransactionSuccessful()
+                    endTransaction()
+                }
             }
         }.onFailure { e ->
             throw SQLExceptionMapper.mapException(e as? SQLException ?: SQLException(e.message, e))
@@ -262,9 +301,11 @@ internal class JdbcConnection(
         if (autoCommit) {
             throw SQLException("Cannot call rollback() while in auto-commit mode")
         }
-        database.runCatching {
-            if (inTransaction) {
-                endTransaction()
+        runCatching {
+            withSession {
+                if (inTransaction) {
+                    endTransaction()
+                }
             }
         }.onFailure { e ->
             throw SQLExceptionMapper.mapException(e as? SQLException ?: SQLException(e.message, e))
@@ -283,8 +324,10 @@ internal class JdbcConnection(
             throw SQLException("Savepoint ${savepoint.savepointName} has already been released or invalidated")
         }
         runCatching {
-            database.rollbackToSavepoint(savepoint.savepointName)
-            database.releaseSavepoint(savepoint.savepointName)
+            withSession {
+                rollbackToSavepoint(savepoint.savepointName)
+                releaseSavepoint(savepoint.savepointName)
+            }
         }.onFailure { e ->
             throw SQLExceptionMapper.mapException(e as? SQLException ?: SQLException(e.message, e))
         }
@@ -301,7 +344,7 @@ internal class JdbcConnection(
             throw SQLException("Cannot create savepoint while in auto-commit mode")
         }
         return runCatching {
-            JdbcSavepoint(database.setSavepoint(name))
+            JdbcSavepoint(withSession { setSavepoint(name) })
         }.getOrElse { e ->
             throw SQLExceptionMapper.mapException(e as? SQLException ?: SQLException(e.message, e))
         }
@@ -313,7 +356,7 @@ internal class JdbcConnection(
             throw SQLException("Savepoint ${savepoint.savepointName} has already been released or invalidated")
         }
         runCatching {
-            database.releaseSavepoint(savepoint.savepointName)
+            withSession { releaseSavepoint(savepoint.savepointName) }
         }.onFailure { e ->
             throw SQLExceptionMapper.mapException(e as? SQLException ?: SQLException(e.message, e))
         }
@@ -332,11 +375,20 @@ internal class JdbcConnection(
 
     override fun close() {
         if (CLOSED.compareAndSet(this, false, true)) {
-            closePreparedStatementPool()
-            sharedDatabase.runCatching {
-                release()
-            }.onFailure { e ->
-                logger.debug("Error releasing database on connection close: {}", e.message)
+            try {
+                closePreparedStatementPool()
+            } finally {
+                databaseSession?.run {
+                    runCatching(::close).onFailure { e ->
+                        logger.debug("Error rolling back database session on connection close: {}", e.message)
+                    }
+                }
+                sharedDatabase.releaseTransaction(sessionOwner)
+                sharedDatabase.runCatching {
+                    release()
+                }.onFailure { e ->
+                    logger.debug("Error releasing database on connection close: {}", e.message)
+                }
             }
         }
     }
@@ -475,7 +527,7 @@ internal class JdbcConnection(
             return false
         }
         return runCatching {
-            database.exec("SELECT 1")
+            withSession { exec("SELECT 1") }
             true
         }.getOrElse { e ->
             logger.warn("Connection validation failed: {}", e.message)
@@ -503,17 +555,21 @@ internal class JdbcConnection(
         close()
     }
 
-    override fun <T> unwrap(iface: Class<T>): T = if (iface.isAssignableFrom(this::class.java)) {
-        @Suppress("UNCHECKED_CAST")
-        this as T
-    } else if (iface.isAssignableFrom(SQLDatabase::class.java)) {
-        @Suppress("UNCHECKED_CAST")
-        database as T
-    } else {
-        throw SQLException("Cannot unwrap to ${iface.name}")
+    override fun <T> unwrap(iface: Class<T>): T = when {
+        iface.isAssignableFrom(this::class.java) ->
+            @Suppress("UNCHECKED_CAST")
+            this as T
+        databaseSession != null && iface.isAssignableFrom(SQLDatabaseSession::class.java) ->
+            @Suppress("UNCHECKED_CAST")
+            databaseSession as T
+        iface.isAssignableFrom(SQLDatabase::class.java) ->
+            @Suppress("UNCHECKED_CAST")
+            database as T
+        else -> throw SQLException("Cannot unwrap to ${iface.name}")
     }
 
     override fun isWrapperFor(iface: Class<*>): Boolean = iface.isAssignableFrom(this::class.java) ||
+        databaseSession != null && iface.isAssignableFrom(SQLDatabaseSession::class.java) ||
         iface.isAssignableFrom(SQLDatabase::class.java)
 
     private fun checkClosed() {
@@ -525,22 +581,40 @@ internal class JdbcConnection(
     private fun applyConnectionProperties() {
         runCatching {
             val foreignKeys = properties.getProperty("foreignKeys")?.toBoolean() ?: true
-            database.exec("PRAGMA foreign_keys = ${if (foreignKeys) { 1 } else { 0 } }")
+            withSession { exec("PRAGMA foreign_keys = ${if (foreignKeys) { 1 } else { 0 } }") }
         }.onFailure { e ->
             throw SQLExceptionMapper.mapException(e as? SQLException ?: SQLException(e.message, e))
         }
     }
 
     internal fun ensureTransaction() {
-        if (!autoCommit && !readOnly && !database.inTransaction) {
-            database.beginImmediateTransaction()
+        if (!autoCommit && !readOnly) {
+            withSession {
+                if (!inTransaction) {
+                    beginImmediateTransaction()
+                }
+            }
         }
+    }
+
+    internal fun <T> withSession(block: SQLDatabase.() -> T): T {
+        checkClosed()
+        // This deliberately examines the current thread's selected session before installing ours. It prevents a JDBC
+        // call from hiding an ambient or re-entrant transaction; ThreadLocalSession cannot observe another thread here.
+        if (databaseSession != null && !databaseSession.isActiveOnCurrentThread && database.inTransaction) {
+            throw SQLException(
+                "The current thread has a SQLDatabase transaction outside this JDBC connection's session"
+            )
+        }
+        val session = databaseSession ?: return block(database)
+        return session.execute(block)
     }
 
     internal fun checkWritable() {
         if (readOnly) {
             throw SQLException("attempt to write a readonly database (SQLITE_READONLY)")
         }
+        sharedDatabase.checkPrimaryConnectionAccess(sessionOwner)
     }
 
     internal fun addWarning(warning: SQLWarning) {

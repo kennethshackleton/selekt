@@ -113,6 +113,39 @@ class SQLDatabase(
         }
     }
 
+    /**
+     * Opens an explicitly owned session with callbacks for coordinating its lifecycle with an external owner.
+     * The returned session is not thread-safe and must be closed when no longer needed.
+     *
+     * @param beforeSessionAccess invoked before each explicit-session operation.
+     * @param beforePrimaryConnectionAccess invoked before waiting for the primary connection.
+     * @param onTransactionStateChanged invoked at successful transaction begin and at every subsequent end.
+     */
+    @JvmSynthetic
+    fun openSession(
+        beforeSessionAccess: () -> Unit,
+        beforePrimaryConnectionAccess: () -> Unit,
+        onTransactionStateChanged: (Boolean) -> Unit
+    ): SQLDatabaseSession {
+        retain()
+        return SQLDatabaseSession(
+            this,
+            session.newSession(beforePrimaryConnectionAccess, onTransactionStateChanged),
+            beforeSessionAccess
+        )
+    }
+
+    internal fun <T> withSession(
+        explicitSession: SQLSession,
+        block: SQLDatabase.() -> T
+    ): T = pledge {
+        session.withSession(explicitSession) {
+            block(this)
+        }
+    }
+
+    internal fun isSessionActive(explicitSession: SQLSession): Boolean = session.isOverriddenBy(explicitSession)
+
     override val inTransaction: Boolean
         get() = session().inTransaction
 
@@ -177,7 +210,7 @@ class SQLDatabase(
         sqlStatementType: SQLStatementType,
         bindArgs: Array<out Any?>?
     ): ISQLStatement = pledge {
-        SQLStatement.compile(session, sql, sqlStatementType, bindArgs)
+        SQLStatement.compile(session.freeze(), sql, sqlStatementType, bindArgs)
     }
 
     override fun delete(
@@ -309,17 +342,17 @@ class SQLDatabase(
             .orderBy(orderBy)
             .limit(limit)
             .toString()
-            .let { query(SQLQuery.create(session, it, SQLStatementType.SELECT, selectionArgs)) }
+            .let { query(SQLQuery.create(session.freeze(), it, SQLStatementType.SELECT, selectionArgs)) }
     }
 
     override fun query(
         sql: String,
         selectionArgs: Array<out Any?>
-    ): ICursor = query(SQLQuery.create(session, sql, sql.resolvedSqlStatementType(), selectionArgs))
+    ): ICursor = query(SQLQuery.create(session.freeze(), sql, sql.resolvedSqlStatementType(), selectionArgs))
 
     override fun query(query: ISQLQuery): ICursor = query(
         SQLQuery.create(
-            session,
+            session.freeze(),
             query.sql,
             query.sql.resolvedSqlStatementType(),
             query.argCount

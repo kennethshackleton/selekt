@@ -16,7 +16,7 @@
 
 package com.bloomberg.selekt.jdbc.transaction
 
-import com.bloomberg.selekt.SQLDatabase
+import com.bloomberg.selekt.SQLDatabaseSession
 import com.bloomberg.selekt.SQLTransactionListener
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -59,14 +59,16 @@ internal class JdbcTransactionListenerTest {
                 statement.executeUpdate("DROP TABLE IF EXISTS test")
                 statement.executeUpdate("CREATE TABLE test (id INTEGER PRIMARY KEY, value TEXT)")
             }
-            val database = connection.unwrap(SQLDatabase::class.java)
+            val database = connection.unwrap(SQLDatabaseSession::class.java)
             connection.autoCommit = false
-            database.beginExclusiveTransactionWithListener(listener)
+            database.execute { beginExclusiveTransactionWithListener(listener) }
             connection.createStatement().use { statement ->
                 statement.executeUpdate("INSERT INTO test (value) VALUES ('test')")
             }
-            database.setTransactionSuccessful()
-            database.endTransaction()
+            database.execute {
+                setTransactionSuccessful()
+                endTransaction()
+            }
             assertEquals(1, listener.beginCount.get(), "onBegin should be called once")
             assertEquals(1, listener.commitCount.get(), "onCommit should be called once")
             assertEquals(0, listener.rollbackCount.get(), "onRollback should not be called")
@@ -86,13 +88,13 @@ internal class JdbcTransactionListenerTest {
                 it.executeUpdate("DROP TABLE IF EXISTS test2")
                 it.executeUpdate("CREATE TABLE test2 (id INTEGER PRIMARY KEY, value TEXT)")
             }
-            val database = connection.unwrap(SQLDatabase::class.java)
+            val database = connection.unwrap(SQLDatabaseSession::class.java)
             connection.autoCommit = false
-            database.beginExclusiveTransactionWithListener(listener)
+            database.execute { beginExclusiveTransactionWithListener(listener) }
             connection.createStatement().use {
                 it.executeUpdate("INSERT INTO test2 (value) VALUES ('rollback-test')")
             }
-            database.endTransaction()
+            database.execute { endTransaction() }
             assertEquals(1, listener.beginCount.get(), "onBegin should be called once")
             assertEquals(0, listener.commitCount.get(), "onCommit should not be called")
             assertEquals(1, listener.rollbackCount.get(), "onRollback should be called once via native hook")
@@ -112,24 +114,30 @@ internal class JdbcTransactionListenerTest {
                 statement.executeUpdate("DROP TABLE IF EXISTS test6")
                 statement.executeUpdate("CREATE TABLE test6 (id INTEGER PRIMARY KEY, value TEXT)")
             }
-            val database = connection.unwrap(SQLDatabase::class.java)
-            database.beginExclusiveTransactionWithListener(listener)
+            val database = connection.unwrap(SQLDatabaseSession::class.java)
+            database.execute { beginExclusiveTransactionWithListener(listener) }
             connection.createStatement().use {
                 it.executeUpdate("INSERT INTO test6 (value) VALUES ('first')")
             }
-            database.setTransactionSuccessful()
-            database.endTransaction()
-            database.beginExclusiveTransactionWithListener(listener)
+            database.execute {
+                setTransactionSuccessful()
+                endTransaction()
+                beginExclusiveTransactionWithListener(listener)
+            }
             connection.createStatement().use {
                 it.executeUpdate("INSERT INTO test6 (value) VALUES ('second')")
             }
-            database.endTransaction()
-            database.beginExclusiveTransactionWithListener(listener)
+            database.execute {
+                endTransaction()
+                beginExclusiveTransactionWithListener(listener)
+            }
             connection.createStatement().use {
                 it.executeUpdate("INSERT INTO test6 (value) VALUES ('third')")
             }
-            database.setTransactionSuccessful()
-            database.endTransaction()
+            database.execute {
+                setTransactionSuccessful()
+                endTransaction()
+            }
             assertEquals(3, listener.beginCount.get(), "onBegin should be called 3 times")
             assertEquals(2, listener.commitCount.get(), "onCommit should be called 2 times (first and third)")
             assertEquals(1, listener.rollbackCount.get(), "onRollback should be called 1 time (second)")
@@ -149,19 +157,21 @@ internal class JdbcTransactionListenerTest {
                 statement.executeUpdate("DROP TABLE IF EXISTS test7")
                 statement.executeUpdate("CREATE TABLE test7 (id INTEGER PRIMARY KEY, value TEXT)")
             }
-            val database = connection.unwrap(SQLDatabase::class.java)
-            database.beginExclusiveTransactionWithListener(listener)
+            val database = connection.unwrap(SQLDatabaseSession::class.java)
+            database.execute { beginExclusiveTransactionWithListener(listener) }
             connection.createStatement().use {
                 it.executeUpdate("INSERT INTO test7 (value) VALUES ('outer')")
             }
-            database.beginExclusiveTransaction()
+            database.execute { beginExclusiveTransaction() }
             connection.createStatement().use {
                 it.executeUpdate("INSERT INTO test7 (value) VALUES ('inner')")
             }
-            database.setTransactionSuccessful()
-            database.endTransaction()
-            database.setTransactionSuccessful()
-            database.endTransaction()
+            database.execute {
+                setTransactionSuccessful()
+                endTransaction()
+                setTransactionSuccessful()
+                endTransaction()
+            }
             assertEquals(1, listener.beginCount.get(), "onBegin should be called once for outer transaction")
             assertEquals(1, listener.commitCount.get(), "onCommit should be called once when outer transaction commits")
             assertEquals(0, listener.rollbackCount.get(), "onRollback should not be called")
@@ -186,18 +196,22 @@ internal class JdbcTransactionListenerTest {
                 it.executeUpdate("DROP TABLE IF EXISTS test8")
                 it.executeUpdate("CREATE TABLE test8 (id INTEGER PRIMARY KEY, value TEXT)")
             }
-            val database = connection.unwrap(SQLDatabase::class.java)
-            database.beginExclusiveTransactionWithListener(listener)
-            database.setTransactionSuccessful()
-            database.endTransaction()
+            val database = connection.unwrap(SQLDatabaseSession::class.java)
+            database.execute {
+                beginExclusiveTransactionWithListener(listener)
+                setTransactionSuccessful()
+                endTransaction()
+            }
             assertEquals(1, listener.beginCount.get())
             assertEquals(1, listener.commitCount.get())
-            database.beginExclusiveTransaction()
+            database.execute { beginExclusiveTransaction() }
             connection.createStatement().use {
                 it.executeUpdate("INSERT INTO test8 (value) VALUES ('no-listener')")
             }
-            database.setTransactionSuccessful()
-            database.endTransaction()
+            database.execute {
+                setTransactionSuccessful()
+                endTransaction()
+            }
             assertEquals(1, listener.beginCount.get(), "onBegin should still be 1 (not called for second transaction)")
             assertEquals(1, listener.commitCount.get(), "onCommit should still be 1 (not called for second transaction)")
             connection.createStatement().use {

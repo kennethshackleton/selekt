@@ -24,18 +24,65 @@ import javax.annotation.concurrent.NotThreadSafe
 internal typealias SQLExecutorPool = TieredObjectPool<String, CloseableSQLExecutor>
 
 /**
+ * Supplies the session used by an operation. Long-lived statements and queries must capture a fixed provider so that
+ * later execution cannot silently switch to a different thread-local session.
+ *
  * @since 0.12.1
  */
+internal fun interface SQLSessionProvider {
+    operator fun invoke(): SQLSession
+}
+
+private class FixedSQLSessionProvider(
+    private val session: SQLSession
+) : SQLSessionProvider {
+    override fun invoke(): SQLSession = session
+}
+
 internal class ThreadLocalSession(
     private val pool: SQLExecutorPool,
     private val useNativeListeners: Boolean = false
-) {
+) : SQLSessionProvider {
     private val threadLocal = object : ThreadLocal<SQLSession>() {
         override fun initialValue() = SQLSession(pool, useNativeListeners)
     }
 
+    private val overrideSession = ThreadLocal<SQLSession?>()
+
     @JvmSynthetic
-    internal operator fun invoke(): SQLSession = threadLocal.get()
+    override operator fun invoke(): SQLSession = overrideSession.get() ?: threadLocal.get()
+
+    fun newSession(
+        beforePrimaryConnectionAccess: () -> Unit = {},
+        onTransactionStateChanged: (Boolean) -> Unit = {}
+    ): SQLSession = SQLSession(
+        pool,
+        useNativeListeners,
+        beforePrimaryConnectionAccess,
+        onTransactionStateChanged
+    )
+
+    /**
+     * Captures the session selected on the current thread. The returned provider always supplies that same session and
+     * is therefore suitable for statements and queries whose lifetime can extend beyond their creation call.
+     */
+    fun freeze(): SQLSessionProvider = FixedSQLSessionProvider(invoke())
+
+    fun isOverriddenBy(session: SQLSession): Boolean = overrideSession.get() === session
+
+    fun <T> withSession(session: SQLSession, block: () -> T): T {
+        val previous = overrideSession.get()
+        overrideSession.set(session)
+        return try {
+            block()
+        } finally {
+            if (previous == null) {
+                overrideSession.remove()
+            } else {
+                overrideSession.set(previous)
+            }
+        }
+    }
 }
 
 private data class SavepointInfo(
@@ -76,8 +123,10 @@ private fun requireSafeSavepointName(name: String) {
 @NotThreadSafe
 internal class SQLSession(
     pool: SQLExecutorPool,
-    private val useNativeListeners: Boolean = false
-) : Session<String, CloseableSQLExecutor>(pool), ISQLTransactor {
+    private val useNativeListeners: Boolean = false,
+    beforePrimaryConnectionAccess: () -> Unit = {},
+    private val onTransactionStateChanged: (Boolean) -> Unit = {}
+) : Session<String, CloseableSQLExecutor>(pool, beforePrimaryConnectionAccess), ISQLTransactor {
     private val state = SQLSessionState()
 
     override fun beginDeferredTransaction() = begin(SQLiteTransactionMode.DEFERRED, null)
@@ -296,7 +345,6 @@ internal class SQLSession(
     private fun begin(sql: String, listener: SQLTransactionListener?) {
         if (!state.inOuterTransaction) {
             internalBegin(sql, listener)
-            state.inOuterTransaction = true
         } else {
             SavepointInfo("sp_auto_${state.savepointStack.size}").let {
                 execute(true) { executor ->
@@ -314,6 +362,8 @@ internal class SQLSession(
     ) {
         retain(true, sql, permits).runCatching {
             executeWithRetry(sql)
+            state.inOuterTransaction = true
+            onTransactionStateChanged(true)
             listener?.let {
                 state.transactionListener = it
                 if (useNativeListeners) {
@@ -324,7 +374,8 @@ internal class SQLSession(
         }.exceptionOrNull()?.let {
             rollbackQuietly()
             state.clear()
-            release(permits)
+            runCatching { onTransactionStateChanged(false) }.exceptionOrNull()?.let(it::addSuppressed)
+            runCatching { release(permits) }.exceptionOrNull()?.let(it::addSuppressed)
             throw it
         }
         state.transactionSql = sql
@@ -338,13 +389,20 @@ internal class SQLSession(
                 rollbackQuietly()
             }
         } finally {
-            if (useNativeListeners && state.transactionListener != null) {
-                execute(false) {
-                    it.setTransactionListener(null)
+            try {
+                if (useNativeListeners && state.transactionListener != null) {
+                    execute(false) {
+                        it.setTransactionListener(null)
+                    }
+                }
+            } finally {
+                state.clear()
+                try {
+                    onTransactionStateChanged(false)
+                } finally {
+                    release(permits)
                 }
             }
-            state.clear()
-            release(permits)
         }
     }
 
@@ -408,7 +466,8 @@ interface ISQLTransactor {
 
 @NotThreadSafe
 internal open class Session<K : Any, T : IPooledObject<K>>(
-    private val pool: TieredObjectPool<K, T>
+    private val pool: TieredObjectPool<K, T>,
+    private val beforePrimaryObjectAccess: () -> Unit = {}
 ) {
     private var obj: T? = null
     protected var retainCount = 0
@@ -453,7 +512,12 @@ internal open class Session<K : Any, T : IPooledObject<K>>(
         primary: Boolean,
         permits: Int,
         block: () -> T
-    ) = (obj ?: (if (primary) pool.borrowPrimaryObject() else block()).also {
+    ) = (obj ?: (if (primary) {
+        beforePrimaryObjectAccess()
+        pool.borrowPrimaryObject()
+    } else {
+        block()
+    }).also {
         obj = it
         it.onBorrowed()
     }).also {

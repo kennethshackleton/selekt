@@ -124,7 +124,7 @@ internal fun String.resolvedSqlStatementType(): SQLStatementType = trimStartByIn
 @Suppress("Detekt.MethodOverloading")
 @ThreadSafe
 internal class SQLStatement private constructor(
-    private val session: ThreadLocalSession,
+    private val session: SQLSessionProvider,
     private val sql: String,
     private val statementType: SQLStatementType,
     private val args: Array<Any?>,
@@ -136,7 +136,7 @@ internal class SQLStatement private constructor(
     @Suppress("Detekt.TooManyFunctions")
     companion object {
         fun execute(
-            session: ThreadLocalSession,
+            session: SQLSessionProvider,
             sql: String,
             statementType: SQLStatementType,
             bindArgs: Array<out Any?>
@@ -145,7 +145,7 @@ internal class SQLStatement private constructor(
         }
 
         fun execute(
-            session: ThreadLocalSession,
+            session: SQLSessionProvider,
             sql: String,
             bindArgs: Sequence<Array<out Any?>>
         ): Int {
@@ -156,7 +156,7 @@ internal class SQLStatement private constructor(
         }
 
         fun execute(
-            session: ThreadLocalSession,
+            session: SQLSessionProvider,
             sql: String,
             bindArgs: List<Array<out Any?>>
         ): Int {
@@ -167,7 +167,7 @@ internal class SQLStatement private constructor(
         }
 
         fun execute(
-            session: ThreadLocalSession,
+            session: SQLSessionProvider,
             sql: String,
             bindArgs: Array<out Array<out Any?>>,
             fromIndex: Int = 0,
@@ -180,7 +180,7 @@ internal class SQLStatement private constructor(
         }
 
         fun execute(
-            session: ThreadLocalSession,
+            session: SQLSessionProvider,
             sql: String,
             bindArgs: Iterable<Array<out Any?>>
         ): Int {
@@ -191,7 +191,7 @@ internal class SQLStatement private constructor(
         }
 
         fun executeRows(
-            session: ThreadLocalSession,
+            session: SQLSessionProvider,
             sql: String,
             bindArgs: Iterable<ParameterRow>
         ): Int {
@@ -202,13 +202,13 @@ internal class SQLStatement private constructor(
         }
 
         fun execute(
-            session: ThreadLocalSession,
+            session: SQLSessionProvider,
             sql: String,
             bindArgs: Stream<Array<out Any?>>
         ) = execute(session, sql, bindArgs.asSequence())
 
         fun executeForInt(
-            session: ThreadLocalSession,
+            session: SQLSessionProvider,
             sql: String,
             statementType: SQLStatementType,
             bindArgs: Array<out Any?>
@@ -217,7 +217,7 @@ internal class SQLStatement private constructor(
         }
 
         fun executeForString(
-            session: ThreadLocalSession,
+            session: SQLSessionProvider,
             sql: String,
             statementType: SQLStatementType,
             bindArgs: Array<out Any?>
@@ -226,7 +226,7 @@ internal class SQLStatement private constructor(
         }
 
         fun executeInsert(
-            session: ThreadLocalSession,
+            session: SQLSessionProvider,
             sql: String,
             bindArgs: Array<out Any?>
         ) = session().execute(true, sql) {
@@ -234,7 +234,7 @@ internal class SQLStatement private constructor(
         }
 
         fun executeUpdateDelete(
-            session: ThreadLocalSession,
+            session: SQLSessionProvider,
             sql: String,
             bindArgs: Array<out Any?>
         ) = session().execute(true, sql) {
@@ -242,7 +242,7 @@ internal class SQLStatement private constructor(
         }
 
         fun compile(
-            session: ThreadLocalSession,
+            session: SQLSessionProvider,
             sql: String,
             statementType: SQLStatementType,
             bindArgs: Array<out Any?>?
