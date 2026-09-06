@@ -326,7 +326,7 @@ internal class JdbcDatabaseMetaData(
     override fun locatorsUpdateCopy(): Boolean = false
 
     private fun executeMetadataQuery(sql: String): ResultSet = JdbcResultSet(
-        database.query(sql, emptyArray()),
+        connection.withSession { database.query(sql, emptyArray()) },
         null
     )
 

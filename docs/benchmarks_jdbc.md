@@ -66,10 +66,10 @@ Latest JMH results for querying and fully consuming 50,000 text values through J
   var STREAM_BENCH_LABELS = {
     'AsciiStreamASCII': 'getAsciiStream() — ASCII',
     'AsciiStreamLATIN1': 'getAsciiStream() — Latin-1 characters',
-    'AsciiStreamUTF16': 'getAsciiStream() — euro and emoji',
+    'AsciiStreamUTF16': 'getAsciiStream() — emoji',
     'CharacterStreamASCII': 'getCharacterStream() — ASCII',
     'CharacterStreamLATIN1': 'getCharacterStream() — Latin-1 characters',
-    'CharacterStreamUTF16': 'getCharacterStream() — euro and emoji'
+    'CharacterStreamUTF16': 'getCharacterStream() — emoji'
   };
 
   function drawPairs(pairs, containerId, defaultUnit, prefix, benchOrder, labels) {

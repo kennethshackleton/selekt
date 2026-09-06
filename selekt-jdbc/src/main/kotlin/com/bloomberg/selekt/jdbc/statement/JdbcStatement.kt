@@ -148,7 +148,9 @@ open class JdbcStatement internal constructor(
         var signalHandedOff = false
         try {
             val isReadOnly = runCatching {
-                database.compileStatement(sql).use { it.isReadOnly }
+                connection.withSession {
+                    database.compileStatement(sql).use { it.isReadOnly }
+                }
             }.getOrElse { e ->
                 throw SQLExceptionMapper.mapException(e as? SQLException ?: SQLException(e.message, e))
             }
@@ -184,17 +186,19 @@ open class JdbcStatement internal constructor(
         sql: String,
         args: Array<Any?>,
         signal: CancellationSignal?
-    ): ICursor = if (resultSetType == ResultSet.TYPE_FORWARD_ONLY && !connection.isReadOnly) {
-        if (signal != null) {
-            database.queryForwardOnly(sql, args, signal)
+    ): ICursor = connection.withSession {
+        if (resultSetType == ResultSet.TYPE_FORWARD_ONLY && !connection.isReadOnly) {
+            if (signal != null) {
+                database.queryForwardOnly(sql, args, signal)
+            } else {
+                database.queryForwardOnly(sql, args)
+            }
         } else {
-            database.queryForwardOnly(sql, args)
-        }
-    } else {
-        if (signal != null) {
-            database.query(sql, args, signal)
-        } else {
-            database.query(sql, args)
+            if (signal != null) {
+                database.query(sql, args, signal)
+            } else {
+                database.query(sql, args)
+            }
         }
     }
 
@@ -202,10 +206,12 @@ open class JdbcStatement internal constructor(
         signal: CancellationSignal?,
         primary: Boolean,
         block: SQLDatabase.() -> T
-    ): T = if (signal != null) {
-        database.withCancellationSignal(signal, primary = primary, block = block)
-    } else {
-        block(database)
+    ): T = connection.withSession {
+        if (signal != null) {
+            database.withCancellationSignal(signal, primary = primary, block = block)
+        } else {
+            block(database)
+        }
     }
 
     private fun executeUpdate(sql: String, statement: ISQLStatement): Int {
@@ -379,6 +385,7 @@ open class JdbcStatement internal constructor(
             val signal = activateCancellationSignalOrNull()
             try {
                 withCancellation(signal, primary = true) {
+                    connection.ensureTransaction()
                     executeBatchStatements()
                 }
             } catch (e: OperationCancelledException) {

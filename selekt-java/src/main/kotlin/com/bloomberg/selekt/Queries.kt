@@ -32,7 +32,7 @@ private fun emptyCursorWindowPage() = CursorWindowPage(SimpleCursorWindow(), 0, 
  */
 @NotThreadSafe
 internal class SQLQuery internal constructor(
-    private val session: ThreadLocalSession,
+    private val session: SQLSessionProvider,
     private val sql: String,
     private val statementType: SQLStatementType,
     private val bindArgs: Array<Any?>
@@ -41,7 +41,7 @@ internal class SQLQuery internal constructor(
 
     companion object {
         fun create(
-            session: ThreadLocalSession,
+            session: SQLSessionProvider,
             @Language("RoomSql") sql: String,
             statementType: SQLStatementType,
             argsCount: Int
@@ -49,7 +49,7 @@ internal class SQLQuery internal constructor(
 
         @Suppress("UNCHECKED_CAST")
         fun create(
-            session: ThreadLocalSession,
+            session: SQLSessionProvider,
             @Language("RoomSql") sql: String,
             statementType: SQLStatementType,
             args: Array<out Any?>

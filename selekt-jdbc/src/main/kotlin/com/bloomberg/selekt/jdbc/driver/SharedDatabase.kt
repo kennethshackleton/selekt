@@ -18,6 +18,10 @@ package com.bloomberg.selekt.jdbc.driver
 
 import com.bloomberg.selekt.SQLDatabase
 import com.bloomberg.selekt.SharedResource
+import java.sql.SQLException
+import java.util.concurrent.locks.ReentrantLock
+import javax.annotation.concurrent.GuardedBy
+import kotlin.concurrent.withLock
 
 /**
  * A reference-counted wrapper around [SQLDatabase] for use by the JDBC driver cache.
@@ -34,6 +38,64 @@ internal class SharedDatabase(
     val database: SQLDatabase,
     private val onClose: () -> Unit = {}
 ) : SharedResource() {
+    private val transactionOwnerLock = ReentrantLock()
+
+    // A transaction is claimed at its actual SQLSession begin boundary, before listener callbacks can re-enter JDBC,
+    // and released at its end boundary or on connection close. The active thread follows sequential session hand-offs.
+    @GuardedBy("transactionOwnerLock")
+    private var transactionOwner: Any? = null
+    @GuardedBy("transactionOwnerLock")
+    private var transactionOwnerActiveThread: Thread? = null
+
+    /**
+     * Records the thread currently entering an already-owned transaction session.
+     */
+    fun enterSession(owner: Any) = transactionOwnerLock.withLock {
+        if (transactionOwner === owner) {
+            transactionOwnerActiveThread = Thread.currentThread()
+        }
+    }
+
+    /**
+     * Synchronizes ownership at the SQLSession transaction begin and end boundaries.
+     */
+    fun synchronizeTransaction(owner: Any, inTransaction: Boolean) = transactionOwnerLock.withLock {
+        if (inTransaction) {
+            val currentOwner = transactionOwner
+            if (currentOwner != null && currentOwner !== owner) {
+                throw SQLException("Database transaction is already owned by another JDBC connection")
+            }
+            transactionOwner = owner
+            transactionOwnerActiveThread = Thread.currentThread()
+        } else if (transactionOwner === owner) {
+            transactionOwner = null
+            transactionOwnerActiveThread = null
+        }
+    }
+
+    /**
+     * Releases ownership when its JDBC connection closes, including after rollback failure.
+     */
+    fun releaseTransaction(owner: Any) = transactionOwnerLock.withLock {
+        if (transactionOwner === owner) {
+            transactionOwner = null
+            transactionOwnerActiveThread = null
+        }
+    }
+
+    /**
+     * Rejects only re-entrant primary-connection access by a different owner on the transaction's active thread.
+     * Access from another thread is allowed to reach the connection pool and wait for the physical writer normally.
+     */
+    fun checkPrimaryConnectionAccess(owner: Any) = transactionOwnerLock.withLock {
+        if (transactionOwner !== null &&
+            transactionOwner !== owner &&
+            transactionOwnerActiveThread === Thread.currentThread()
+        ) {
+            throw SQLException("Database transaction on this thread is owned by another JDBC connection")
+        }
+    }
+
     override fun onReleased() {
         database.use { _ ->
             onClose()
