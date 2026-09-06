@@ -127,6 +127,10 @@ internal class NativeCursorWindow(
         }
     }
 
+    override fun getTextBytes(row: Int, column: Int): ByteArray? = slotOffset(row, column).let { offset ->
+        if (tagAt(offset) == SQL_TEXT) readBytes(offset) else null
+    }
+
     override fun isNull(row: Int, column: Int) = SQL_NULL == tagAt(slotOffset(row, column))
 
     override fun numberOfRows() = rowCount

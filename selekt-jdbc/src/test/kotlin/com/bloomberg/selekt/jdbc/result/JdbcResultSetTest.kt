@@ -49,6 +49,8 @@ import org.mockito.kotlin.any
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.doThrow
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.never
+import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 
 internal class JdbcResultSetTest {
@@ -624,7 +626,7 @@ internal class JdbcResultSetTest {
         val value = "ASCII-é-😀"
         mockCursor.run {
             whenever(isNull(1)) doReturn false
-            whenever(getBlob(1)) doReturn value.toByteArray(Charsets.UTF_8)
+            whenever(getTextBytes(1)) doReturn value.toByteArray(Charsets.UTF_8)
         }
         resultSet.getAsciiStream(2).use {
             assertEquals(
@@ -632,6 +634,20 @@ internal class JdbcResultSetTest {
                 it?.readBytes()?.toList()
             )
         }
+        verify(mockCursor, never()).type(1)
+        verify(mockCursor, never()).getBlob(1)
+    }
+
+    @Test
+    fun getAsciiStreamFailsWhenDirectTextRetrievalIsUnsupported() {
+        mockCursor.run {
+            whenever(getTextBytes(1)) doThrow UnsupportedOperationException()
+        }
+        assertFailsWith<SQLException> {
+            resultSet.getAsciiStream(2)
+        }
+        verify(mockCursor, never()).type(1)
+        verify(mockCursor, never()).getBlob(1)
     }
 
     @Test
@@ -709,7 +725,7 @@ internal class JdbcResultSetTest {
         val value = "ASCII-é-😀"
         mockCursor.run {
             whenever(isNull(1)) doReturn false
-            whenever(getBlob(1)) doReturn value.toByteArray(Charsets.UTF_8)
+            whenever(getTextBytes(1)) doReturn value.toByteArray(Charsets.UTF_8)
         }
         resultSet.getCharacterStream(2).use { reader ->
             val actual = buildString {

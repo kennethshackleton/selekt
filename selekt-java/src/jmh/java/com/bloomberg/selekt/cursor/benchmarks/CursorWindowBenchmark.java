@@ -16,6 +16,7 @@
 
 package com.bloomberg.selekt.cursor.benchmarks;
 
+import com.bloomberg.selekt.ColumnType;
 import com.bloomberg.selekt.CursorWindowPage;
 import com.bloomberg.selekt.ICursor;
 import com.bloomberg.selekt.ICursorWindow;
@@ -260,6 +261,24 @@ public class CursorWindowBenchmark {
         state.cursor.moveToPosition(-1);
         while (state.cursor.moveToNext()) {
             blackhole.consume(state.cursor.getString(0));
+        }
+    }
+
+    @Benchmark
+    public void iterateCursorTextBytes(StringState state, Blackhole blackhole) {
+        state.cursor.moveToPosition(-1);
+        while (state.cursor.moveToNext()) {
+            blackhole.consume(state.cursor.getTextBytes(0));
+        }
+    }
+
+    @Benchmark
+    public void iterateCursorTypeThenBlob(StringState state, Blackhole blackhole) {
+        state.cursor.moveToPosition(-1);
+        while (state.cursor.moveToNext()) {
+            if (state.cursor.type(0) == ColumnType.STRING) {
+                blackhole.consume(state.cursor.getBlob(0));
+            }
         }
     }
 

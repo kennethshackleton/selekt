@@ -24,6 +24,7 @@ import org.mockito.kotlin.spy
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
@@ -72,6 +73,20 @@ internal class WindowedCursorTest {
         val columns = emptyArray<String>()
         val cursor = windowedCursor(columns, mock())
         assertSame(columns, cursor.columnNames())
+    }
+
+    @Test
+    fun getTextBytesDelegatesToWindow() {
+        val bytes = "hello".toByteArray()
+        val window = mock<ICursorWindow> {
+            on { numberOfRows() } doReturn 1
+            on { getTextBytes(0, 0) } doReturn bytes
+        }
+        windowedCursor(arrayOf("a"), window).run {
+            assertTrue(moveToFirst())
+            assertContentEquals(bytes, getTextBytes(0))
+        }
+        verify(window).getTextBytes(0, 0)
     }
 
     @Test
