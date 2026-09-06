@@ -1,6 +1,10 @@
 Change Log
 ==========
 
+## Version 1.2.0
+
+* Support Room BundledSQLiteDriver.
+
 ## Version 1.1.1
 
 * Optimise empty strings in native cursor window.

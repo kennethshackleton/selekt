@@ -348,6 +348,10 @@ internal class SQLConnection(
         SQLStatementInformation(isReadOnly, parameterCount, columnNames)
     }
 
+    override fun prepareForRawStatement(sql: String): SQLPreparedStatement = acquirePreparedStatement(sql)
+
+    override fun releaseRawStatement(statement: SQLPreparedStatement) = releasePreparedStatement(statement)
+
     override fun releaseMemory() {
         preparedStatements.evictAll()
         sqlite.databaseReleaseMemory(databaseHandle)

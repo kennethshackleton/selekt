@@ -35,9 +35,11 @@ internal class SQLQuery internal constructor(
     private val session: SQLSessionProvider,
     private val sql: String,
     private val statementType: SQLStatementType,
-    private val bindArgs: Array<Any?>
+    private val bindArgs: Array<Any?>,
+    private var highestBoundIndex: Int = 0
 ) : IQuery {
     private val namedParameters: Map<String, Int> by lazy { parseNamedParameters(sql) }
+    private var preparedParameterCount: Int? = null
 
     companion object {
         fun create(
@@ -53,7 +55,10 @@ internal class SQLQuery internal constructor(
             @Language("RoomSql") sql: String,
             statementType: SQLStatementType,
             args: Array<out Any?>
-        ) = SQLQuery(session, sql, statementType, Array<Any?>::class.java.cast(args.copyOf()))
+        ): SQLQuery {
+            val argsCopy = Array<Any?>::class.java.cast(args.copyOf())
+            return SQLQuery(session, sql, statementType, argsCopy, argsCopy.size)
+        }
     }
 
     override fun bindBlob(index: Int, value: ByteArray) = bind(index, value)
@@ -84,6 +89,7 @@ internal class SQLQuery internal constructor(
 
     override fun clearBindings() {
         bindArgs.fill(null)
+        highestBoundIndex = 0
     }
 
     override fun close() {
@@ -101,14 +107,20 @@ internal class SQLQuery internal constructor(
         ) {
             it.prepare(sql).apply {
                 if (isReadOnly) {
-                    page = it.executeForCursorWindow(sql, bindArgs, 0, windowSize, true)
+                    page = it.executeForCursorWindow(sql, validatedBindArgs(parameterCount), 0, windowSize, true)
                 }
             }
         }
         page?.let { return information to it }
         return if (information !== EMPTY_SQL_STATEMENT_INFORMATION) {
             information to session().execute(true, sql, statementType, emptyCursorWindowPage()) {
-                it.executeForCursorWindow(sql, bindArgs, 0, windowSize, true)
+                it.executeForCursorWindow(
+                    sql,
+                    validatedBindArgs(information.parameterCount),
+                    0,
+                    windowSize,
+                    true
+                )
             }
         } else {
             // Query was resolved as transactional(!!)
@@ -117,7 +129,7 @@ internal class SQLQuery internal constructor(
     }
 
     fun refiller(windowSize: Int): (Int) -> CursorWindowPage {
-        val args = bindArgs.copyOf()
+        val args = validatedBindArgs(checkNotNull(preparedParameterCount)).copyOf()
         return { startPosition ->
             session().execute(false, sql, statementType, emptyCursorWindowPage()) {
                 it.executeForCursorWindow(sql, args, startPosition, windowSize, false)
@@ -127,6 +139,20 @@ internal class SQLQuery internal constructor(
 
     private fun bind(index: Int, arg: Any?) {
         bindArgs[index - 1] = arg
+        highestBoundIndex = maxOf(highestBoundIndex, index)
+    }
+
+    private fun validatedBindArgs(parameterCount: Int): Array<out Any?> {
+        require(bindArgs.size >= parameterCount) {
+            "Expected $parameterCount bind arguments but ${bindArgs.size} were provided."
+        }
+        // Some SupportSQLiteQuery adapters report their 1-based binding storage capacity as the argument count.
+        // Ignore only unused capacity; never discard an argument that was actually bound.
+        require(highestBoundIndex <= parameterCount) {
+            "Cannot bind argument at index $highestBoundIndex; statement has $parameterCount parameters."
+        }
+        preparedParameterCount = parameterCount
+        return if (bindArgs.size == parameterCount) { bindArgs } else { bindArgs.copyOf(parameterCount) }
     }
 
     private fun resolveParameterIndex(name: String): Int = namedParameters[name] ?: throw IllegalArgumentException(
