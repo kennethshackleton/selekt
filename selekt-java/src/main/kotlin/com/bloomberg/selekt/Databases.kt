@@ -117,21 +117,18 @@ class SQLDatabase(
      * Opens an explicitly owned session with callbacks for coordinating its lifecycle with an external owner.
      * The returned session is not thread-safe and must be closed when no longer needed.
      *
-     * @param beforeSessionAccess invoked before each explicit-session operation.
      * @param beforePrimaryConnectionAccess invoked before waiting for the primary connection.
      * @param onTransactionStateChanged invoked at successful transaction begin and at every subsequent end.
      */
     @JvmSynthetic
     fun openSession(
-        beforeSessionAccess: () -> Unit,
         beforePrimaryConnectionAccess: () -> Unit,
         onTransactionStateChanged: (Boolean) -> Unit
     ): SQLDatabaseSession {
         retain()
         return SQLDatabaseSession(
             this,
-            session.newSession(beforePrimaryConnectionAccess, onTransactionStateChanged),
-            beforeSessionAccess
+            session.newSession(beforePrimaryConnectionAccess, onTransactionStateChanged)
         )
     }
 

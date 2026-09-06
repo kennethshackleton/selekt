@@ -382,25 +382,25 @@ internal class JdbcTransactionOwnershipTest {
     }
 
     @Test
-    fun transactionSessionFollowsSequentialVirtualThreadHandoffs() {
-        val url = newDatabaseUrl("virtual-thread")
+    fun transactionRejectsSequentialVirtualThreadHandoff() {
+        val url = newDatabaseUrl("virtual-thread-handoff")
         createSchema(url)
         DriverManager.getConnection(url).use { connection ->
-            connection.autoCommit = false
-            val failure = AtomicReference<Throwable?>()
-            Thread.ofVirtual().start {
-                runCatching {
-                    connection.createStatement().use {
-                        it.executeUpdate("INSERT INTO test(value) VALUES ('virtual')")
-                    }
-                }.onFailure(failure::set)
-            }.join()
-            assertNull(failure.get())
-            Thread.ofVirtual().start {
-                runCatching(connection::rollback).onFailure(failure::set)
-            }.join()
-            assertNull(failure.get())
-            assertEquals(0, rowCount(connection))
+            DriverManager.getConnection(url).use { observer ->
+                connection.autoCommit = false
+                connection.createStatement().use {
+                    it.executeUpdate("INSERT INTO test(value) VALUES ('main')")
+                }
+                val failure = AtomicReference<Throwable?>()
+                Thread.ofVirtual().start {
+                    runCatching(connection::rollback).onFailure(failure::set)
+                }.join()
+                assertTrue(failure.get() is SQLException)
+                assertTrue(failure.get()?.message.orEmpty().contains("owned by another thread"))
+                assertEquals(0, rowCount(observer))
+                connection.rollback()
+                assertEquals(0, rowCount(connection))
+            }
         }
     }
 

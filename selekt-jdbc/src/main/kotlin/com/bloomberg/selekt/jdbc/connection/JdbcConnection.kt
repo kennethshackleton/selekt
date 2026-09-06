@@ -78,7 +78,6 @@ internal class JdbcConnection private constructor(
             return OwnedSession(
                 owner,
                 sharedDatabase.database.openSession(
-                    beforeSessionAccess = { sharedDatabase.enterSession(owner) },
                     beforePrimaryConnectionAccess = { sharedDatabase.checkPrimaryConnectionAccess(owner) },
                     onTransactionStateChanged = { inTransaction ->
                         sharedDatabase.synchronizeTransaction(owner, inTransaction)
@@ -594,6 +593,7 @@ internal class JdbcConnection private constructor(
 
     internal fun <T> withSession(block: SQLDatabase.() -> T): T {
         checkClosed()
+        sharedDatabase.checkTransactionThread(sessionOwner)
         // This deliberately examines the current thread's selected session before installing ours. It prevents a JDBC
         // call from hiding an ambient or re-entrant transaction; ThreadLocalSession cannot observe another thread here.
         if (databaseSession != null && !databaseSession.isActiveOnCurrentThread && database.inTransaction) {

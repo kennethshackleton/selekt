@@ -38,21 +38,25 @@ internal class SharedDatabase(
     val database: SQLDatabase,
     private val onClose: () -> Unit = {}
 ) : SharedResource() {
+    private data class TransactionOwner(
+        val token: Any,
+        val thread: Thread
+    )
+
     private val transactionOwnerLock = ReentrantLock()
 
     // A transaction is claimed at its actual SQLSession begin boundary, before listener callbacks can re-enter JDBC,
-    // and released at its end boundary or on connection close. The active thread follows sequential session hand-offs.
+    // and released at its end boundary or on connection close.
     @GuardedBy("transactionOwnerLock")
-    private var transactionOwner: Any? = null
-    @GuardedBy("transactionOwnerLock")
-    private var transactionOwnerActiveThread: Thread? = null
+    private var transactionOwner: TransactionOwner? = null
 
     /**
-     * Records the thread currently entering an already-owned transaction session.
+     * Rejects attempts to hand an active transaction to another thread.
      */
-    fun enterSession(owner: Any) = transactionOwnerLock.withLock {
-        if (transactionOwner === owner) {
-            transactionOwnerActiveThread = Thread.currentThread()
+    fun checkTransactionThread(owner: Any) = transactionOwnerLock.withLock {
+        val currentOwner = transactionOwner
+        if (currentOwner?.token === owner && currentOwner.thread !== Thread.currentThread()) {
+            throw SQLException("JDBC connection transaction is owned by another thread")
         }
     }
 
@@ -61,15 +65,13 @@ internal class SharedDatabase(
      */
     fun synchronizeTransaction(owner: Any, inTransaction: Boolean) = transactionOwnerLock.withLock {
         if (inTransaction) {
-            val currentOwner = transactionOwner
+            val currentOwner = transactionOwner?.token
             if (currentOwner != null && currentOwner !== owner) {
                 throw SQLException("Database transaction is already owned by another JDBC connection")
             }
-            transactionOwner = owner
-            transactionOwnerActiveThread = Thread.currentThread()
-        } else if (transactionOwner === owner) {
+            transactionOwner = TransactionOwner(owner, Thread.currentThread())
+        } else if (transactionOwner?.token === owner) {
             transactionOwner = null
-            transactionOwnerActiveThread = null
         }
     }
 
@@ -77,9 +79,8 @@ internal class SharedDatabase(
      * Releases ownership when its JDBC connection closes, including after rollback failure.
      */
     fun releaseTransaction(owner: Any) = transactionOwnerLock.withLock {
-        if (transactionOwner === owner) {
+        if (transactionOwner?.token === owner) {
             transactionOwner = null
-            transactionOwnerActiveThread = null
         }
     }
 
@@ -88,9 +89,10 @@ internal class SharedDatabase(
      * Access from another thread is allowed to reach the connection pool and wait for the physical writer normally.
      */
     fun checkPrimaryConnectionAccess(owner: Any) = transactionOwnerLock.withLock {
-        if (transactionOwner !== null &&
-            transactionOwner !== owner &&
-            transactionOwnerActiveThread === Thread.currentThread()
+        val currentOwner = transactionOwner
+        if (currentOwner != null &&
+            currentOwner.token !== owner &&
+            currentOwner.thread === Thread.currentThread()
         ) {
             throw SQLException("Database transaction on this thread is owned by another JDBC connection")
         }
