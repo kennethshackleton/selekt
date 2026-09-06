@@ -4,6 +4,9 @@ Change Log
 ## Version 1.2.0
 
 * Support Room BundledSQLiteDriver.
+* Close prepared statement result sets before pooling.
+* Bind JDBC max-row limits as query parameters.
+* Enforce JDBC read-only mode across query and unwrap paths.
 
 ## Version 1.1.1
 
