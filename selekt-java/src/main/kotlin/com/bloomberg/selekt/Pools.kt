@@ -59,7 +59,7 @@ internal fun openConnectionPool(
     val pool = createObjectPool(
         factory,
         sharedExecutor,
-        configuration.toPoolConfiguration()
+        configuration.toPoolConfiguration(path)
     )
     return pool to factory
 }
@@ -79,11 +79,26 @@ internal interface CloseableSQLExecutor : SQLExecutor, Closeable, IPooledObject<
 
 internal data class ProgressHandlerSetting(val instructionCount: Int, val handler: SQLProgressHandler)
 
-private fun DatabaseConfiguration.toPoolConfiguration() = PoolConfiguration(
+internal fun DatabaseConfiguration.toPoolConfiguration(path: String) = PoolConfiguration(
     evictionDelayMillis = evictionDelayMillis,
     evictionIntervalMillis = timeBetweenEvictionRunsMillis,
-    maxTotal = maxConnectionPoolSize
+    maxTotal = if (path.isPrivateInMemoryDatabase()) { 1 } else { maxConnectionPoolSize }
 )
+
+private fun String.isPrivateInMemoryDatabase(): Boolean = this == ":memory:" || startsWith("file:") && run {
+    val uriPath = substringBefore('?')
+    val parameters = substringAfter('?', "")
+        .split('&')
+        .mapNotNull { parameter ->
+            val separator = parameter.indexOf('=')
+            if (separator > 0) {
+                parameter.substring(0, separator) to parameter.substring(separator + 1)
+            } else {
+                null
+            }
+        }.toMap()
+    (uriPath == "file::memory:" || parameters["mode"] == "memory") && parameters["cache"] != "shared"
+}
 
 @ThreadSafe
 internal class SQLConnectionFactory(
