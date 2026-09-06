@@ -52,6 +52,7 @@ import java.sql.Time
 import java.sql.Timestamp
 import java.sql.Types
 import java.util.Properties
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
@@ -60,7 +61,9 @@ import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import org.junit.jupiter.api.AfterEach
+import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.doReturn
+import org.mockito.kotlin.eq
 
 internal class JdbcPreparedStatementTest {
     private lateinit var database: SQLDatabase
@@ -131,6 +134,66 @@ internal class JdbcPreparedStatementTest {
         verify(firstCursor).close()
         assertSame(secondResultSet, preparedStatement.resultSet)
         assertTrue(firstResultSet.isClosed)
+    }
+
+    @Test
+    fun maxRowsIsAppendedAsBoundParameter() {
+        whenever(database.query(any<String>(), any<Array<Any?>>())) doReturn cursor
+        preparedStatement.apply {
+            setInt(1, 42)
+            setString(2, "test")
+            maxRows = 5
+        }.executeQuery()
+        val args = argumentCaptor<Array<Any?>>()
+        verify(database).query(
+            eq("SELECT * FROM users WHERE id = ? AND name = ? LIMIT ?"),
+            args.capture()
+        )
+        assertContentEquals(arrayOf<Any?>(42, "test", 5), args.firstValue)
+    }
+
+    @Test
+    fun maxRowsDoesNotOverrideExistingLiteralLimit() {
+        val sql = "SELECT * FROM users WHERE id = ? LIMIT 5"
+        whenever(database.query(any<String>(), any<Array<Any?>>())) doReturn cursor
+        JdbcPreparedStatement(connection, database, sql).use { statement ->
+            statement.setInt(1, 42)
+            statement.maxRows = 3
+            statement.executeQuery().close()
+            val args = argumentCaptor<Array<Any?>>()
+            verify(database).query(eq(sql), args.capture())
+            assertContentEquals(arrayOf<Any?>(42), args.firstValue)
+        }
+    }
+
+    @Test
+    fun maxRowsDoesNotAppendSecondParameterizedLimit() {
+        val sql = "SELECT * FROM users WHERE id = ? LIMIT ?"
+        whenever(database.query(any<String>(), any<Array<Any?>>())) doReturn cursor
+        JdbcPreparedStatement(connection, database, sql).use { statement ->
+            statement.setInt(1, 42)
+            statement.setInt(2, 5)
+            statement.maxRows = 3
+            statement.executeQuery().close()
+            val args = argumentCaptor<Array<Any?>>()
+            verify(database).query(eq(sql), args.capture())
+            assertContentEquals(arrayOf<Any?>(42, 5), args.firstValue)
+        }
+    }
+
+    @Test
+    fun maxRowsPreservesParameterizedLimitWithTrailingSemicolon() {
+        val sql = "SELECT * FROM users WHERE id = ? LIMIT ?;"
+        whenever(database.query(any<String>(), any<Array<Any?>>())) doReturn cursor
+        JdbcPreparedStatement(connection, database, sql).use { statement ->
+            statement.setInt(1, 42)
+            statement.setInt(2, 5)
+            statement.maxRows = 3
+            statement.executeQuery().close()
+            val args = argumentCaptor<Array<Any?>>()
+            verify(database).query(eq(sql), args.capture())
+            assertContentEquals(arrayOf<Any?>(42, 5), args.firstValue)
+        }
     }
 
     @Test

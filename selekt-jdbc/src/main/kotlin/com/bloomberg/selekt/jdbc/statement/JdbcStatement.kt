@@ -64,7 +64,7 @@ open class JdbcStatement internal constructor(
         private val CLOSED: VarHandle = MethodHandles.lookup()
             .findVarHandle(JdbcStatement::class.java, "closed", Boolean::class.javaPrimitiveType)
 
-        private val limitPattern = Regex("""\bLIMIT\s+\d+""", RegexOption.IGNORE_CASE)
+        private val limitPattern = Regex("""\bLIMIT\b""", RegexOption.IGNORE_CASE)
 
         private val TIMEOUT_SCHEDULER: ScheduledExecutorService = Executors.newScheduledThreadPool(
             1,
@@ -105,7 +105,7 @@ open class JdbcStatement internal constructor(
             closeCurrentResultSet()
             val signal = activateCancellationSignalOrNull()
             val cursor = runCatching {
-                queryWithSignal(applyMaxRows(sql), emptyArray(), signal)
+                queryWithMaxRows(sql, emptyArray(), signal)
             }.getOrElse {
                 deactivateCancellationSignal()
                 throw it.translateCancellation()
@@ -176,7 +176,7 @@ open class JdbcStatement internal constructor(
     }
 
     private fun executeQueryInternal(sql: String, signal: CancellationSignal?) {
-        val cursor = queryWithSignal(applyMaxRows(sql), emptyArray(), signal)
+        val cursor = queryWithMaxRows(sql, emptyArray(), signal)
         trackResultSet(JdbcResultSet(cursor, this, resultSetType, resultSetConcurrency, resultSetHoldability))
     }
 
@@ -488,15 +488,19 @@ open class JdbcStatement internal constructor(
     override fun isWrapperFor(iface: Class<*>): Boolean = iface.isAssignableFrom(this::class.java) ||
         iface.isAssignableFrom(SQLDatabase::class.java)
 
-    protected fun applyMaxRows(sql: String): String {
+    protected fun queryWithMaxRows(
+        sql: String,
+        args: Array<Any?>,
+        signal: CancellationSignal?
+    ): ICursor {
         if (maxRows <= 0) {
-            return sql
+            return queryWithSignal(sql, args, signal)
         }
         val trimmed = sql.trimEnd().removeSuffix(";").trimEnd()
         return if (trimmed.contains(limitPattern)) {
-            sql
+            queryWithSignal(sql, args, signal)
         } else {
-            "$trimmed LIMIT $maxRows"
+            queryWithSignal("$trimmed LIMIT ?", args + maxRows, signal)
         }
     }
 

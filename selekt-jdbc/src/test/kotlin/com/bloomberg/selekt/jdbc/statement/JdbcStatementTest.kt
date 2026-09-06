@@ -35,6 +35,7 @@ import org.mockito.kotlin.whenever
 import java.sql.SQLException
 import java.sql.Statement
 import java.util.Properties
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
@@ -43,6 +44,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import org.mockito.kotlin.doReturn
+import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.verify
 
@@ -174,10 +176,12 @@ internal class JdbcStatementTest {
     @Test
     fun maxRowsAppendsLimit() {
         statement.maxRows = 5
-        whenever(mockDatabase.query(eq("SELECT * FROM users LIMIT 5"), any<Array<Any?>>()))
+        whenever(mockDatabase.query(eq("SELECT * FROM users LIMIT ?"), any<Array<Any?>>()))
             .doReturn(mockCursor)
         statement.executeQuery("SELECT * FROM users")
-        verify(mockDatabase).query(eq("SELECT * FROM users LIMIT 5"), any<Array<Any?>>())
+        val args = argumentCaptor<Array<Any?>>()
+        verify(mockDatabase).query(eq("SELECT * FROM users LIMIT ?"), args.capture())
+        assertContentEquals(arrayOf<Any?>(5), args.firstValue)
     }
 
     @Test
@@ -195,16 +199,20 @@ internal class JdbcStatementTest {
         whenever(mockDatabase.query(eq("SELECT * FROM users LIMIT 10"), any<Array<Any?>>()))
             .doReturn(mockCursor)
         statement.executeQuery("SELECT * FROM users LIMIT 10")
-        verify(mockDatabase).query(eq("SELECT * FROM users LIMIT 10"), any<Array<Any?>>())
+        val args = argumentCaptor<Array<Any?>>()
+        verify(mockDatabase).query(eq("SELECT * FROM users LIMIT 10"), args.capture())
+        assertContentEquals(emptyArray(), args.firstValue)
     }
 
     @Test
     fun maxRowsStripsTrailingSemiColon() {
         statement.maxRows = 5
-        whenever(mockDatabase.query(eq("SELECT * FROM users LIMIT 5"), any<Array<Any?>>()))
+        whenever(mockDatabase.query(eq("SELECT * FROM users LIMIT ?"), any<Array<Any?>>()))
             .doReturn(mockCursor)
         statement.executeQuery("SELECT * FROM users;")
-        verify(mockDatabase).query(eq("SELECT * FROM users LIMIT 5"), any<Array<Any?>>())
+        val args = argumentCaptor<Array<Any?>>()
+        verify(mockDatabase).query(eq("SELECT * FROM users LIMIT ?"), args.capture())
+        assertContentEquals(arrayOf<Any?>(5), args.firstValue)
     }
 
     @Test

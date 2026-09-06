@@ -138,7 +138,7 @@ internal open class JdbcPreparedStatement(
             parameterRow.materializeTo(materializedArgs)
             val signal = activateCancellationSignalOrNull()
             runCatching {
-                val cursor = queryWithSignal(applyMaxRows(sql), materializedArgs, signal)
+                val cursor = queryWithMaxRows(sql, materializedArgs, signal)
                 trackResultSet(
                     JdbcResultSet(
                         cursor,
