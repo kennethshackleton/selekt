@@ -110,10 +110,9 @@ open class JdbcStatement internal constructor(
                 deactivateCancellationSignal()
                 throw it.translateCancellation()
             }
-            return JdbcResultSet(cursor, this, resultSetType, resultSetConcurrency, resultSetHoldability).also {
-                updateCount = -1
-                currentResultSet = it
-            }
+            return trackResultSet(
+                JdbcResultSet(cursor, this, resultSetType, resultSetConcurrency, resultSetHoldability)
+            )
         } catch (e: Exception) {
             throw SQLExceptionMapper.mapException(e as? SQLException ?: SQLException(e.message, e))
         }
@@ -178,8 +177,13 @@ open class JdbcStatement internal constructor(
 
     private fun executeQueryInternal(sql: String, signal: CancellationSignal?) {
         val cursor = queryWithSignal(applyMaxRows(sql), emptyArray(), signal)
-        currentResultSet = JdbcResultSet(cursor, this, resultSetType, resultSetConcurrency, resultSetHoldability)
+        trackResultSet(JdbcResultSet(cursor, this, resultSetType, resultSetConcurrency, resultSetHoldability))
+    }
+
+    protected fun <T : ResultSet> trackResultSet(resultSet: T): T {
+        currentResultSet = resultSet
         updateCount = -1
+        return resultSet
     }
 
     protected fun queryWithSignal(
@@ -379,6 +383,7 @@ open class JdbcStatement internal constructor(
 
     override fun executeBatch(): IntArray {
         checkClosed()
+        closeCurrentResultSet()
         return if (batchedSqlStatements.isEmpty()) {
             emptyIntArray
         } else {
@@ -505,4 +510,6 @@ open class JdbcStatement internal constructor(
         currentResultSet?.close()
         currentResultSet = null
     }
+
+    internal fun hasOpenResultSet(): Boolean = currentResultSet?.isClosed == false
 }

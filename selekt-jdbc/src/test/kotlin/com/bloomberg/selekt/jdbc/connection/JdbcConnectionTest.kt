@@ -1526,6 +1526,32 @@ internal class JdbcConnectionTest {
         }
     }
 
+    @Test
+    fun closingPreparedStatementReleasesForwardCursorConnection() {
+        val tempFile = File.createTempFile("selekt-prepared-cursor-release-test-", ".db").apply(File::deleteOnExit)
+        val url = "jdbc:sqlite:${tempFile.absolutePath}?journalMode=WAL&busyTimeout=2000&poolSize=1"
+        try {
+            DriverManager.getConnection(url).use { jdbcConnection ->
+                jdbcConnection.createStatement().use { statement ->
+                    statement.execute("CREATE TABLE test (id INTEGER PRIMARY KEY, value TEXT)")
+                    statement.execute("INSERT INTO test (value) VALUES ('row1')")
+                }
+                val preparedStatement = jdbcConnection.prepareStatement("SELECT * FROM test")
+                val resultSet = preparedStatement.executeQuery()
+                assertTrue(resultSet.next())
+                preparedStatement.close()
+                assertTrue(resultSet.isClosed)
+                jdbcConnection.createStatement().use { statement ->
+                    assertEquals(1, statement.executeUpdate("INSERT INTO test (value) VALUES ('row2')"))
+                }
+            }
+        } finally {
+            tempFile.delete()
+            File("${tempFile.absolutePath}-wal").delete()
+            File("${tempFile.absolutePath}-shm").delete()
+        }
+    }
+
     @Suppress("Detekt.NestedBlockDepth")
     @Test
     fun readQueryOnSeparateThreadWhileWriteTransactionIsOpen() {
