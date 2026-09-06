@@ -562,18 +562,10 @@ internal class JdbcConnection private constructor(
         iface.isAssignableFrom(this::class.java) ->
             @Suppress("UNCHECKED_CAST")
             this as T
-        databaseSession != null && iface.isAssignableFrom(SQLDatabaseSession::class.java) ->
-            @Suppress("UNCHECKED_CAST")
-            databaseSession as T
-        iface.isAssignableFrom(SQLDatabase::class.java) ->
-            @Suppress("UNCHECKED_CAST")
-            database as T
         else -> throw SQLException("Cannot unwrap to ${iface.name}")
     }
 
-    override fun isWrapperFor(iface: Class<*>): Boolean = iface.isAssignableFrom(this::class.java) ||
-        databaseSession != null && iface.isAssignableFrom(SQLDatabaseSession::class.java) ||
-        iface.isAssignableFrom(SQLDatabase::class.java)
+    override fun isWrapperFor(iface: Class<*>): Boolean = iface.isAssignableFrom(this::class.java)
 
     private fun checkClosed() {
         if (isClosed) {

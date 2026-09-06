@@ -191,6 +191,7 @@ open class JdbcStatement internal constructor(
         args: Array<Any?>,
         signal: CancellationSignal?
     ): ICursor = connection.withSession {
+        checkReadOnlyQuery(sql, args)
         if (resultSetType == ResultSet.TYPE_FORWARD_ONLY && !connection.isReadOnly) {
             if (signal != null) {
                 database.queryForwardOnly(sql, args, signal)
@@ -202,6 +203,16 @@ open class JdbcStatement internal constructor(
                 database.query(sql, args, signal)
             } else {
                 database.query(sql, args)
+            }
+        }
+    }
+
+    private fun checkReadOnlyQuery(sql: String, args: Array<Any?>) {
+        if (connection.isReadOnly) {
+            database.compileStatement(sql, args).use { statement ->
+                if (!statement.isReadOnly) {
+                    connection.checkWritable()
+                }
             }
         }
     }
@@ -478,15 +489,11 @@ open class JdbcStatement internal constructor(
     override fun <T> unwrap(iface: Class<T>): T = if (iface.isAssignableFrom(this::class.java)) {
         @Suppress("UNCHECKED_CAST")
         this as T
-    } else if (iface.isAssignableFrom(SQLDatabase::class.java)) {
-        @Suppress("UNCHECKED_CAST")
-        return database as T
     } else {
         throw SQLException("Cannot unwrap to ${iface.name}")
     }
 
-    override fun isWrapperFor(iface: Class<*>): Boolean = iface.isAssignableFrom(this::class.java) ||
-        iface.isAssignableFrom(SQLDatabase::class.java)
+    override fun isWrapperFor(iface: Class<*>): Boolean = iface.isAssignableFrom(this::class.java)
 
     protected fun queryWithMaxRows(
         sql: String,

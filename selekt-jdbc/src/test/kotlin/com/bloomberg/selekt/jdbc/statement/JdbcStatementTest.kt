@@ -479,13 +479,13 @@ internal class JdbcStatementTest {
     }
 
     @Test
-    fun unwrapToSQLDatabase() {
-        assertSame(mockDatabase, statement.unwrap(SQLDatabase::class.java))
+    fun cannotUnwrapToSQLDatabase() {
+        assertFailsWith<SQLException> { statement.unwrap(SQLDatabase::class.java) }
     }
 
     @Test
-    fun isWrapperForSQLDatabase() {
-        assertTrue(statement.isWrapperFor(SQLDatabase::class.java))
+    fun isNotWrapperForSQLDatabase() {
+        assertFalse(statement.isWrapperFor(SQLDatabase::class.java))
     }
 
     @Test
