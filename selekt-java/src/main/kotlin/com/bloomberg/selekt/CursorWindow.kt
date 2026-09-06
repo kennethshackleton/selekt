@@ -115,6 +115,9 @@ internal class SimpleCursorWindow : ICursorWindow {
         }
     }
 
+    override fun getTextBytes(row: Int, column: Int) =
+        (get(row, column) as? String)?.toByteArray(Charsets.UTF_8)
+
     override fun isNull(row: Int, column: Int) = null == get(row, column)
 
     override fun numberOfRows() = rows.size
@@ -167,6 +170,8 @@ internal interface ICursorWindow : Closeable {
     fun getShort(row: Int, column: Int): Short
 
     fun getString(row: Int, column: Int): String?
+
+    fun getTextBytes(row: Int, column: Int): ByteArray?
 
     fun isNull(row: Int, column: Int): Boolean
 

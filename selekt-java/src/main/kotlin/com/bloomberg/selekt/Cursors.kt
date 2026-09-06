@@ -48,6 +48,16 @@ interface ICursor : Closeable {
 
     fun getString(index: Int): String?
 
+    /**
+     * Returns the UTF-8 bytes of a text column, or null when the column does not contain text.
+     *
+     * @throws UnsupportedOperationException when direct text retrieval is not supported
+     * @since 1.1.1
+     */
+    fun getTextBytes(index: Int): ByteArray? = throw UnsupportedOperationException(
+        "Direct text retrieval is not supported."
+    )
+
     fun isAfterLast(): Boolean
 
     fun isBeforeFirst(): Boolean
@@ -139,6 +149,8 @@ internal class WindowedCursor(
     override fun getLong(index: Int) = read(index) { getLong(it, index) }
 
     override fun getString(index: Int) = read(index) { getString(it, index) }
+
+    override fun getTextBytes(index: Int) = read(index) { getTextBytes(it, index) }
 
     override fun isAfterLast() = count.let { it == 0 || it == position }
 
@@ -232,6 +244,12 @@ internal class ForwardCursor(
     override fun getLong(index: Int) = statement.columnLong(index)
 
     override fun getString(index: Int) = statement.columnString(index)
+
+    override fun getTextBytes(index: Int) = if (statement.columnType(index) == SQL_TEXT) {
+        statement.columnBlob(index)
+    } else {
+        null
+    }
 
     override fun isAfterLast() = throw UnsupportedOperationException()
 

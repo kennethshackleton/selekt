@@ -858,6 +858,10 @@ internal class JdbcResultSet(
         validateColumnIndex(columnIndex)
         return try {
             val cursorIndex = columnIndex - 1
+            cursor.getTextBytes(cursorIndex)?.let {
+                wasNull = false
+                return fromUtf8(it)
+            }
             when (cursor.type(cursorIndex)) {
                 ColumnType.NULL -> {
                     wasNull = true

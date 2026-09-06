@@ -119,6 +119,19 @@ internal class ForwardCursorTest {
     }
 
     @Test
+    fun getTextBytes() {
+        val expected = "hello".toByteArray()
+        val statement = mock<SQLPreparedStatement>().apply {
+            whenever(columnNames) doReturn arrayOf("bar")
+            whenever(columnType(any())) doReturn SQL_TEXT
+            whenever(columnBlob(any())) doReturn expected
+        }
+        assertSame(expected, ForwardCursor(statement).getTextBytes(0))
+        verify(statement, times(1)).columnType(eq(0))
+        verify(statement, times(1)).columnBlob(eq(0))
+    }
+
+    @Test
     fun isAfterLastIsUnsupported() {
         assertFailsWith<UnsupportedOperationException> {
             ForwardCursor(mock<SQLPreparedStatement>().apply {

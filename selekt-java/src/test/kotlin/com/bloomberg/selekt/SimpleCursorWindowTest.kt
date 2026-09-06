@@ -17,6 +17,7 @@
 package com.bloomberg.selekt
 
 import org.junit.jupiter.api.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertSame
@@ -69,6 +70,13 @@ internal class SimpleCursorWindowTest {
         assertFailsWith<IllegalStateException> {
             getBlob(0, 0)
         }
+    }
+
+    @Test
+    fun getTextBytes() = window.run {
+        allocateRow()
+        put("hello")
+        assertContentEquals("hello".toByteArray(), getTextBytes(0, 0))
     }
 
     @Test
