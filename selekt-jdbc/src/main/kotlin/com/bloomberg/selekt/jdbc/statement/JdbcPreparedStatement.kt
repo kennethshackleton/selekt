@@ -117,7 +117,13 @@ internal open class JdbcPreparedStatement(
     resultSetConcurrency: Int = ResultSet.CONCUR_READ_ONLY,
     resultSetHoldability: Int = ResultSet.CLOSE_CURSORS_AT_COMMIT
 ) : JdbcStatement(connection, database, resultSetType, resultSetConcurrency, resultSetHoldability), PreparedStatement {
-    private val parameterCount = sql.count { it == '?' }
+    private val parameterCount = try {
+        connection.withSession {
+            database.prepare(sql).use { it.parameterCount }
+        }
+    } catch (e: Exception) {
+        throw SQLExceptionMapper.mapException(e as? SQLException ?: SQLException(e.message, e))
+    }
     private val parameterRow = ParameterRow(parameterCount)
     private val materializedArgs = arrayOfNulls<Any>(parameterCount)
     private val batchRows = ChunkedParameterRows(parameterCount, INITIAL_BATCH_CHUNK_SIZE)

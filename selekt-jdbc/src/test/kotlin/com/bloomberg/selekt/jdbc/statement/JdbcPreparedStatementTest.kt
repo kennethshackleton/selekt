@@ -17,6 +17,7 @@
 package com.bloomberg.selekt.jdbc.statement
 
 import com.bloomberg.selekt.ICursor
+import com.bloomberg.selekt.ISQLRawStatement
 import com.bloomberg.selekt.ISQLStatement
 import com.bloomberg.selekt.ParameterRow
 import com.bloomberg.selekt.SQLDatabase
@@ -74,6 +75,12 @@ internal class JdbcPreparedStatementTest {
     @BeforeEach
     fun setUp() {
         database = mock<SQLDatabase> {
+            whenever(it.prepare(any())) doAnswer { invocation ->
+                val parameterCount = invocation.getArgument<String>(0).count { character -> character == '?' }
+                mock<ISQLRawStatement> {
+                    whenever(it.parameterCount) doReturn parameterCount
+                }
+            }
             whenever(it.queryForwardOnly(any<String>(), any<Array<Any?>>())) doAnswer { invocation ->
                 it.query(
                     invocation.getArgument<String>(0),
