@@ -1,6 +1,12 @@
 Change Log
 ==========
 
+## Version 1.2.1
+
+* Simplify JDBC transaction ownership tracking.
+* Further redact all keying pragmas from statement traces.
+* Keep progress handler callbacks alive until connection close.
+
 ## Version 1.2.0
 
 * Support Room BundledSQLiteDriver.
