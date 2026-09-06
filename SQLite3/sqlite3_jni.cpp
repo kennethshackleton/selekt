@@ -645,8 +645,9 @@ static void freeCommitListenerContext(void* ctx);
 
 struct ProgressHandlerContext {
     JavaVM* vm;
-    jobject handler;
-    jmethodID onProgressMethod;
+    std::mutex mutex;
+    jobject handler = nullptr;
+    jmethodID onProgressMethod = nullptr;
 };
 
 static void freeProgressHandlerContext(ProgressHandlerContext* ctx) {
@@ -680,20 +681,21 @@ static void freeProgressHandlerContext(ProgressHandlerContext* ctx) {
 
 static int progressHandlerCallback(void* ctx) {
     auto context = static_cast<ProgressHandlerContext*>(ctx);
+    auto vm = context->vm;
     JNIEnv* env = nullptr;
     bool didAttach = false;
 #ifdef __ANDROID__
-    if (context->vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) {
-        didAttach = context->vm->AttachCurrentThread(&env, nullptr) == JNI_OK;
+    if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) {
+        didAttach = vm->AttachCurrentThread(&env, nullptr) == JNI_OK;
         if (!didAttach) {
             return 1;
         }
     }
 #else
     void* envVoid = nullptr;
-    if (context->vm->GetEnv(&envVoid, JNI_VERSION_1_6) != JNI_OK) {
+    if (vm->GetEnv(&envVoid, JNI_VERSION_1_6) != JNI_OK) {
         void* attachedEnv = nullptr;
-        if (context->vm->AttachCurrentThread(&attachedEnv, nullptr) == JNI_OK) {
+        if (vm->AttachCurrentThread(&attachedEnv, nullptr) == JNI_OK) {
             env = static_cast<JNIEnv*>(attachedEnv);
             didAttach = true;
         } else {
@@ -703,13 +705,24 @@ static int progressHandlerCallback(void* ctx) {
         env = static_cast<JNIEnv*>(envVoid);
     }
 #endif
-    jint result = env->CallIntMethod(context->handler, context->onProgressMethod);
+    jobject handler = nullptr;
+    jmethodID onProgressMethod = nullptr;
+    {
+        std::scoped_lock lock(context->mutex);
+        handler = env->NewLocalRef(context->handler);
+        onProgressMethod = context->onProgressMethod;
+    }
+    jint result = 1;
+    if (handler != nullptr) {
+        result = env->CallIntMethod(handler, onProgressMethod);
+        env->DeleteLocalRef(handler);
+    }
     if (env->ExceptionCheck()) {
         env->ExceptionClear();
         result = 1;
     }
     if (didAttach) {
-        context->vm->DetachCurrentThread();
+        vm->DetachCurrentThread();
     }
     return result;
 }
@@ -726,7 +739,7 @@ Java_com_bloomberg_selekt_ExternalSQLite_closeV2(
     auto db = reinterpret_cast<sqlite3*>(jdb);
     ProgressHandlerContext* progressCtx = nullptr;
     {
-        std::lock_guard<std::mutex> lock(progressHandlerMapMutex);
+        std::scoped_lock lock(progressHandlerMapMutex);
         auto it = progressHandlerMap.find(db);
         if (it != progressHandlerMap.end()) {
             progressCtx = it->second;
@@ -1332,83 +1345,58 @@ Java_com_bloomberg_selekt_ExternalSQLite_progressHandler(
     auto db = reinterpret_cast<sqlite3*>(jdb);
     bool const unregister = (handler == nullptr || instructionCount <= 0);
     if (unregister) {
-        ProgressHandlerContext* oldContext = nullptr;
-        {
-            std::lock_guard<std::mutex> lock(progressHandlerMapMutex);
-            auto it = progressHandlerMap.find(db);
-            if (it != progressHandlerMap.end()) {
-                oldContext = it->second;
-                progressHandlerMap.erase(it);
-            }
-        }
         sqlite3_progress_handler(db, 0, nullptr, nullptr);
-        freeProgressHandlerContext(oldContext);
         return;
     }
     jclass handlerClass = env->GetObjectClass(handler);
     jmethodID onProgressMethod = env->GetMethodID(handlerClass, "onProgress", "()I");
     if (onProgressMethod == nullptr) {
-        ProgressHandlerContext* oldContext = nullptr;
-        {
-            std::lock_guard<std::mutex> lock(progressHandlerMapMutex);
-            auto it = progressHandlerMap.find(db);
-            if (it != progressHandlerMap.end()) {
-                oldContext = it->second;
-                progressHandlerMap.erase(it);
-            }
-        }
         sqlite3_progress_handler(db, 0, nullptr, nullptr);
-        freeProgressHandlerContext(oldContext);
         return;
     }
-    auto context = new (std::nothrow) ProgressHandlerContext;
-    if (context == nullptr) {
-        ProgressHandlerContext* oldContext = nullptr;
-        {
-            std::lock_guard<std::mutex> lock(progressHandlerMapMutex);
-            auto it = progressHandlerMap.find(db);
-            if (it != progressHandlerMap.end()) {
-                oldContext = it->second;
-                progressHandlerMap.erase(it);
-            }
-        }
+    auto globalHandler = env->NewGlobalRef(handler);
+    if (globalHandler == nullptr) {
         sqlite3_progress_handler(db, 0, nullptr, nullptr);
-        freeProgressHandlerContext(oldContext);
-        throwOutOfMemoryError(env, "ProgressHandlerContext allocation");
-        return;
-    }
-    env->GetJavaVM(&context->vm);
-    context->handler = env->NewGlobalRef(handler);
-    if (context->handler == nullptr) {
-        delete context;
-        ProgressHandlerContext* oldContext = nullptr;
-        {
-            std::lock_guard<std::mutex> lock(progressHandlerMapMutex);
-            auto it = progressHandlerMap.find(db);
-            if (it != progressHandlerMap.end()) {
-                oldContext = it->second;
-                progressHandlerMap.erase(it);
-            }
-        }
-        sqlite3_progress_handler(db, 0, nullptr, nullptr);
-        freeProgressHandlerContext(oldContext);
         throwOutOfMemoryError(env, "NewGlobalRef");
         return;
     }
-    context->onProgressMethod = onProgressMethod;
-    ProgressHandlerContext* oldContext = nullptr;
+    jobject oldHandler = nullptr;
     {
-        std::lock_guard<std::mutex> lock(progressHandlerMapMutex);
+        std::scoped_lock lock(progressHandlerMapMutex);
         auto it = progressHandlerMap.find(db);
+        ProgressHandlerContext* context = nullptr;
         if (it != progressHandlerMap.end()) {
-            oldContext = it->second;
-            it->second = context;
+            context = it->second;
         } else {
-            progressHandlerMap[db] = context;
+            context = new (std::nothrow) ProgressHandlerContext;
+            if (context == nullptr) {
+                env->DeleteGlobalRef(globalHandler);
+                sqlite3_progress_handler(db, 0, nullptr, nullptr);
+                throwOutOfMemoryError(env, "ProgressHandlerContext allocation");
+                return;
+            }
+            env->GetJavaVM(&context->vm);
+            try {
+                progressHandlerMap.emplace(db, context);
+            } catch (std::bad_alloc const&) {
+                delete context;
+                env->DeleteGlobalRef(globalHandler);
+                sqlite3_progress_handler(db, 0, nullptr, nullptr);
+                throwOutOfMemoryError(env, "Progress handler registration");
+                return;
+            }
+        }
+        {
+            std::scoped_lock contextLock(context->mutex);
+            oldHandler = context->handler;
+            context->handler = globalHandler;
+            context->onProgressMethod = onProgressMethod;
         }
         sqlite3_progress_handler(db, instructionCount, progressHandlerCallback, context);
     }
-    freeProgressHandlerContext(oldContext);
+    if (oldHandler != nullptr) {
+        env->DeleteGlobalRef(oldHandler);
+    }
 }
 
 extern "C" JNIEXPORT jint JNICALL
