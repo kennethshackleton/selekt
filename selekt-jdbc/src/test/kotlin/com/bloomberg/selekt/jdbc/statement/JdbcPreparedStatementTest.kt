@@ -62,6 +62,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNotSame
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
@@ -569,6 +570,25 @@ internal class JdbcPreparedStatementTest {
             assertEquals(-2, this[1])
         }
         verify(database).batchRows(any<String>(), any<Iterable<ParameterRow>>())
+    }
+
+    @Test
+    fun executeBatchReturnsIndependentUpdateCounts() {
+        val batchStatement = updateStatement()
+        whenever(database.compileStatement(any<String>(), isNull())) doReturn mock<ISQLStatement>()
+        whenever(database.batchRows(any<String>(), any<Iterable<ParameterRow>>())) doReturn 1
+
+        batchStatement.setInt(2, 1)
+        batchStatement.addBatch()
+        val first = batchStatement.executeBatch()
+
+        batchStatement.setInt(2, 2)
+        batchStatement.addBatch()
+        val second = batchStatement.executeBatch()
+
+        assertNotSame(first, second)
+        first[0] = 42
+        assertContentEquals(intArrayOf(-2), second)
     }
 
     @Test
@@ -1533,7 +1553,7 @@ internal class JdbcPreparedStatementTest {
         val statement = updateStatement()
         whenever(database.compileStatement(any<String>(), isNull())) doReturn mock<ISQLStatement>()
         whenever(database.batchRows(any<String>(), any<Iterable<ParameterRow>>())) doReturn 1
-        statement.apply {
+        val updateCounts = statement.run {
             setString(1, "batched-sensitive-value")
             setInt(2, 1)
             addBatch()
@@ -1553,6 +1573,6 @@ internal class JdbcPreparedStatementTest {
         assertEquals(0, batchRows.size)
         assertSame(batchRowsBeforeClose, batchRows)
         assertSame(batchChunkBeforeClose, readField<Any>(batchRows, "firstChunk"))
-        assertNull(readField<IntArray>(statement, "successArray"))
+        assertContentEquals(intArrayOf(-2), updateCounts)
     }
 }

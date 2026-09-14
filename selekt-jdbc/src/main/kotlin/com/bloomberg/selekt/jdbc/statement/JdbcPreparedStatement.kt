@@ -123,7 +123,6 @@ internal open class JdbcPreparedStatement(
     private val parameterRow = ParameterRow(parameterCount)
     private val batchRows = ChunkedParameterRows(parameterCount, INITIAL_BATCH_CHUNK_SIZE)
     private var totalBatchCount = 0
-    private var successArray: IntArray? = null
 
     private fun validateParameterIndex(parameterIndex: Int) {
         checkClosed()
@@ -253,8 +252,6 @@ internal open class JdbcPreparedStatement(
         clearParameters()
         batchRows.clear()
         totalBatchCount = 0
-        successArray?.fill(0)
-        successArray = null
         super.onReturned()
     }
 
@@ -298,10 +295,7 @@ internal open class JdbcPreparedStatement(
                 connection.ensureTransaction()
                 batchRows(sql, batchRows)
             }
-            val result = successArray?.takeIf { it.size == totalBatchCount }
-                ?: IntArray(totalBatchCount).also { successArray = it }
-            result.fill(Statement.SUCCESS_NO_INFO)
-            return result
+            return IntArray(totalBatchCount) { Statement.SUCCESS_NO_INFO }
         } catch (e: Exception) {
             val mapped = if (e is OperationCancelledException) {
                 SQLExceptionMapper.mapCancellation(e)
