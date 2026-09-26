@@ -715,8 +715,31 @@ jobs:
           path: '**/build/reports/cyclonedx-direct/*-cyclonedx.json'
           if-no-files-found: ignore
 
-      - name: 'Generate repository CycloneDX SBOM'
-        run: ./gradlew :repositoryCyclonedxBom --no-configuration-cache
+      - name: 'Generate and verify repository CycloneDX SBOM'
+        run: |
+          ./gradlew :repositoryCyclonedxBom --configuration-cache
+          SECOND_RUN_OUTPUT="$(./gradlew :repositoryCyclonedxBom --configuration-cache)"
+          printf '%s\n' "$SECOND_RUN_OUTPUT"
+          grep -F 'Configuration cache entry reused.' <<< "$SECOND_RUN_OUTPUT"
+          VERSION="$(sed -n 's/^version=//p' gradle.properties)"
+          SBOM="build/reports/cyclonedx/selekt-${VERSION}.cdx.json"
+          python3 - "$SBOM" "$VERSION" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          path = pathlib.Path(sys.argv[1])
+          expected_version = sys.argv[2]
+          document = json.loads(path.read_text(encoding="utf-8"))
+          root = document["metadata"]["component"]
+          assert root["bom-ref"] == "com.bloomberg.selekt:selekt", root
+          assert root["version"] == expected_version, root
+          component_names = {component["name"] for component in document["components"]}
+          required_components = {"OpenSSL", "SQLCipher", "SQLite", "mimalloc", "vec1"}
+          missing = required_components - component_names
+          assert not missing, f"Missing repository SBOM components: {sorted(missing)}"
+          assert document["dependencies"], "Repository SBOM dependency graph is empty"
+          PY
 
       - name: 'Archive repository SBOMs'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

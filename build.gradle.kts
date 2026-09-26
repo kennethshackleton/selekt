@@ -20,8 +20,6 @@ import io.gitlab.arturbosch.detekt.Detekt
 import io.gitlab.arturbosch.detekt.extensions.DetektExtension
 import java.net.URI
 import java.time.Duration
-import groovy.json.JsonOutput
-import groovy.json.JsonSlurper
 import kotlinx.kover.gradle.plugin.dsl.AggregationType
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.api.tasks.testing.logging.TestLogEvent
@@ -314,52 +312,17 @@ val cyclonedxBom = tasks.register("cyclonedxBom") {
     dependsOn(embeddedSbomProjects.map { "$it:cyclonedxFinalBom" })
 }
 
-val repositoryCyclonedxBom = tasks.register("repositoryCyclonedxBom") {
+val repositoryCyclonedxBom = tasks.register<MergeCycloneDxSboms>("repositoryCyclonedxBom") {
     group = "reporting"
     description = "Merges the published module SBOMs into one repository CycloneDX SBOM."
     dependsOn(cyclonedxBom)
-    val sbomFiles = embeddedSbomProjects.map { projectPath ->
+    sbomFiles.from(embeddedSbomProjects.map { projectPath ->
         project(projectPath).layout.buildDirectory.file(
             "reports/cyclonedx-direct/${project(projectPath).name}-${project(projectPath).version}-cyclonedx.json"
         )
-    }
-    inputs.files(sbomFiles)
-    val output = layout.buildDirectory.file("reports/cyclonedx/selekt-${version}.cdx.json")
-    outputs.file(output)
-    doLast {
-        val parser = JsonSlurper()
-        val documents = sbomFiles.map { parser.parse(it.get().asFile) as Map<*, *> }
-        val first = documents.first().toMutableMap()
-        first["serialNumber"] = "urn:uuid:${java.util.UUID.randomUUID()}"
-        first["metadata"] = (first["metadata"] as Map<*, *>).toMutableMap().apply {
-            put("component", mapOf(
-                "type" to "application",
-                "bom-ref" to "com.bloomberg.selekt:selekt",
-                "group" to "com.bloomberg.selekt",
-                "name" to "selekt",
-                "version" to project.version.toString()
-            ))
-        }
-        val components = linkedMapOf<String, Map<*, *>>()
-        val dependencies = linkedMapOf<String, LinkedHashSet<String>>()
-        documents.forEach { document ->
-            (document["components"] as? List<*>)?.filterIsInstance<Map<*, *>>()?.forEach { component ->
-                components[component["bom-ref"].toString()] = component
-            }
-            (document["dependencies"] as? List<*>)?.filterIsInstance<Map<*, *>>()?.forEach { dependency ->
-                val ref = dependency["ref"].toString()
-                val children = dependencies.getOrPut(ref) { linkedSetOf() }
-                (dependency["dependsOn"] as? List<*>)?.forEach { children += it.toString() }
-            }
-        }
-        first["components"] = components.values.sortedBy { it["bom-ref"].toString() }
-        first["dependencies"] = dependencies.entries.sortedBy { it.key }.map { (ref, children) ->
-            mapOf("ref" to ref, "dependsOn" to children.sorted())
-        }
-        val target = output.get().asFile
-        target.parentFile.mkdirs()
-        target.writeText(JsonOutput.prettyPrint(JsonOutput.toJson(first)) + System.lineSeparator())
-    }
+    })
+    repositoryVersion.set(version.toString())
+    output.set(layout.buildDirectory.file("reports/cyclonedx/selekt-${version}.cdx.json"))
 }
 
 qodana {
