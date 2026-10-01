@@ -165,15 +165,20 @@ namespace {
         return pointer;
     }
 
-    struct ThrowableClasses {
+    struct JniCache {
         jclass illegalArgumentException = nullptr;
         jclass illegalStateException = nullptr;
         jclass indexOutOfBoundsException = nullptr;
         jclass outOfMemoryError = nullptr;
+        jclass sqlCommitListener = nullptr;
+        jclass sqlProgressHandler = nullptr;
+        jmethodID onCommitMethod = nullptr;
+        jmethodID onRollbackMethod = nullptr;
+        jmethodID onProgressMethod = nullptr;
     };
 
-    ThrowableClasses& throwableClasses() {
-        static ThrowableClasses instance;
+    JniCache& jniCache() {
+        static JniCache instance;
         return instance;
     }
 
@@ -183,8 +188,8 @@ namespace {
 #endif
 }
 
-bool initThrowableClasses(JNIEnv* env) {
-    auto& classes = throwableClasses();
+bool initJniCache(JNIEnv* env) {
+    auto& classes = jniCache();
     auto findAndCache = [&](const char* name) -> jclass {
         auto local = env->FindClass(name);
         if (local == nullptr) {
@@ -198,10 +203,24 @@ bool initThrowableClasses(JNIEnv* env) {
     classes.illegalStateException = findAndCache("java/lang/IllegalStateException");
     classes.indexOutOfBoundsException = findAndCache("java/lang/IndexOutOfBoundsException");
     classes.outOfMemoryError = findAndCache("java/lang/OutOfMemoryError");
+    classes.sqlCommitListener = findAndCache("com/bloomberg/selekt/SQLCommitListener");
+    classes.sqlProgressHandler = findAndCache("com/bloomberg/selekt/SQLProgressHandler");
+    if (classes.sqlCommitListener != nullptr) {
+        classes.onCommitMethod = env->GetMethodID(classes.sqlCommitListener, "onCommit", "()I");
+        classes.onRollbackMethod = env->GetMethodID(classes.sqlCommitListener, "onRollback", "()V");
+    }
+    if (classes.sqlProgressHandler != nullptr) {
+        classes.onProgressMethod = env->GetMethodID(classes.sqlProgressHandler, "onProgress", "()I");
+    }
     if (classes.illegalArgumentException != nullptr
         && classes.illegalStateException != nullptr
         && classes.indexOutOfBoundsException != nullptr
-        && classes.outOfMemoryError != nullptr) {
+        && classes.outOfMemoryError != nullptr
+        && classes.sqlCommitListener != nullptr
+        && classes.sqlProgressHandler != nullptr
+        && classes.onCommitMethod != nullptr
+        && classes.onRollbackMethod != nullptr
+        && classes.onProgressMethod != nullptr) {
         return true;
     }
     auto cleanup = [&](jclass& ref) {
@@ -214,32 +233,34 @@ bool initThrowableClasses(JNIEnv* env) {
     cleanup(classes.illegalStateException);
     cleanup(classes.indexOutOfBoundsException);
     cleanup(classes.outOfMemoryError);
+    cleanup(classes.sqlCommitListener);
+    cleanup(classes.sqlProgressHandler);
     return false;
 }
 
 void throwIllegalArgumentException(JNIEnv* env, const char* message) {
-    auto cls = throwableClasses().illegalArgumentException;
+    auto cls = jniCache().illegalArgumentException;
     if (cls != nullptr) {
         env->ThrowNew(cls, message);
     }
 }
 
 void throwIllegalStateException(JNIEnv* env, const char* message) {
-    auto cls = throwableClasses().illegalStateException;
+    auto cls = jniCache().illegalStateException;
     if (cls != nullptr) {
         env->ThrowNew(cls, message);
     }
 }
 
 void throwIndexOutOfBoundsException(JNIEnv* env, const char* message) {
-    auto cls = throwableClasses().indexOutOfBoundsException;
+    auto cls = jniCache().indexOutOfBoundsException;
     if (cls != nullptr) {
         env->ThrowNew(cls, message);
     }
 }
 
 void throwOutOfMemoryError(JNIEnv* env, const char* message) {
-    auto cls = throwableClasses().outOfMemoryError;
+    auto cls = jniCache().outOfMemoryError;
     if (cls != nullptr) {
         env->ThrowNew(cls, message);
     }
@@ -542,12 +563,16 @@ Java_com_bloomberg_selekt_ExternalSQLite_storeSecret(
     }
 }
 
+extern "C" JNIEXPORT const char* selekt_git_commit() {
+    return SELEKT_GIT_COMMIT;
+}
+
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_bloomberg_selekt_ExternalSQLite_gitCommit(
     JNIEnv* env,
     jobject obj
 ) {
-    return env->NewStringUTF(SELEKT_GIT_COMMIT);
+    return env->NewStringUTF(selekt_git_commit());
 }
 
 extern "C" JNIEXPORT jint JNICALL
@@ -1446,14 +1471,6 @@ Java_com_bloomberg_selekt_ExternalSQLite_commitHook(
     if (listener == nullptr) {
         return SQLITE_ERROR;
     }
-    jclass listenerClass = env->GetObjectClass(listener);
-    jmethodID onCommitMethod = env->GetMethodID(listenerClass, "onCommit", "()I");
-    jmethodID onRollbackMethod = env->GetMethodID(listenerClass, "onRollback", "()V");
-    env->DeleteLocalRef(listenerClass);
-    if (onCommitMethod == nullptr || onRollbackMethod == nullptr) {
-        env->ExceptionClear();
-        return SQLITE_ERROR;
-    }
     auto context = new (std::nothrow) CommitListenerContext;
     if (context == nullptr) {
         throwOutOfMemoryError(env, "CommitListenerContext allocation");
@@ -1466,8 +1483,8 @@ Java_com_bloomberg_selekt_ExternalSQLite_commitHook(
         throwOutOfMemoryError(env, "NewGlobalRef");
         return SQLITE_NOMEM;
     }
-    context->onCommitMethod = onCommitMethod;
-    context->onRollbackMethod = onRollbackMethod;
+    context->onCommitMethod = jniCache().onCommitMethod;
+    context->onRollbackMethod = jniCache().onRollbackMethod;
     void* oldContext = sqlite3_commit_hook(db, commitHookCallback, context);
     sqlite3_rollback_hook(db, rollbackHookCallback, context);
     freeCommitListenerContext(oldContext);
@@ -1849,12 +1866,6 @@ Java_com_bloomberg_selekt_ExternalSQLite_progressHandler(
         deactivateProgressHandler(env, db);
         return;
     }
-    jclass handlerClass = env->GetObjectClass(handler);
-    jmethodID onProgressMethod = env->GetMethodID(handlerClass, "onProgress", "()I");
-    if (onProgressMethod == nullptr) {
-        deactivateProgressHandler(env, db);
-        return;
-    }
     auto globalHandler = env->NewGlobalRef(handler);
     if (globalHandler == nullptr) {
         deactivateProgressHandler(env, db);
@@ -1891,7 +1902,7 @@ Java_com_bloomberg_selekt_ExternalSQLite_progressHandler(
             std::scoped_lock contextLock(context->mutex);
             oldHandler = context->handler;
             context->handler = globalHandler;
-            context->onProgressMethod = onProgressMethod;
+            context->onProgressMethod = jniCache().onProgressMethod;
         }
         sqlite3_progress_handler(db, instructionCount, progressHandlerCallback, context);
     }
@@ -2650,28 +2661,34 @@ Java_com_bloomberg_selekt_ExternalSQLite_walCheckpointV2(
     return result;
 }
 
-extern "C" JNIEXPORT void JNICALL
-Java_com_bloomberg_selekt_ExternalSQLite_nativeInit(
-    JNIEnv* env,
-    jobject obj,
-    jlong jSoftHeapLimit
-) {
-    if (sqlite3_initialize() != SQLITE_OK) {
-        throwIllegalStateException(env, "sqlite3_initialize failed");
-        return;
+extern "C" JNIEXPORT int selekt_native_init(int64_t softHeapLimit) {
+    auto result = sqlite3_initialize();
+    if (result != SQLITE_OK) {
+        return result;
     }
 #ifdef VEC1_STATIC
     std::call_once(vec1AutoExtensionOnce, [] {
         vec1AutoExtensionResult = sqlite3_vec1_extra_init(nullptr);
     });
     if (vec1AutoExtensionResult != SQLITE_OK) {
-        throwIllegalStateException(env, "sqlite3_vec1_extra_init failed");
-        return;
+        return vec1AutoExtensionResult;
     }
 #endif
-    sqlite3_soft_heap_limit64(jSoftHeapLimit);
+    sqlite3_soft_heap_limit64(softHeapLimit);
     LOG_D("SQLite3 has soft heap limit %llu bytes.", sqlite3_soft_heap_limit64(-1));
     LOG_D("SQLite3 has hard heap limit %llu bytes.", sqlite3_hard_heap_limit64(-1));
+    return SQLITE_OK;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_bloomberg_selekt_ExternalSQLite_nativeInit(
+    JNIEnv* env,
+    jobject obj,
+    jlong jSoftHeapLimit
+) {
+    if (selekt_native_init(jSoftHeapLimit) != SQLITE_OK) {
+        throwIllegalStateException(env, "SQLite initialization failed");
+    }
 }
 
 #pragma clang diagnostic push
@@ -2686,7 +2703,7 @@ JNI_OnLoad(
     if (vm->GetEnv((void**) &env, JNI_VERSION_1_6) != JNI_OK) {
         return JNI_ERR;
     }
-    if (!initThrowableClasses(env)) {
+    if (!initJniCache(env)) {
         return JNI_ERR;
     }
     return JNI_VERSION_1_6;
@@ -2703,7 +2720,7 @@ JNI_OnUnload(
         return;
     }
     env = static_cast<JNIEnv*>(envVoid);
-    auto& classes = throwableClasses();
+    auto& classes = jniCache();
     auto deleteIfNonNull = [&](jclass& ref) {
         if (ref != nullptr) {
             env->DeleteGlobalRef(ref);
@@ -2714,4 +2731,6 @@ JNI_OnUnload(
     deleteIfNonNull(classes.illegalStateException);
     deleteIfNonNull(classes.indexOutOfBoundsException);
     deleteIfNonNull(classes.outOfMemoryError);
+    deleteIfNonNull(classes.sqlCommitListener);
+    deleteIfNonNull(classes.sqlProgressHandler);
 }

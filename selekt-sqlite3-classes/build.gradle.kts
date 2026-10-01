@@ -112,6 +112,7 @@ listOf(JvmTarget.JVM_25).forEach {
         from(sourceSets.main.get().output) {
             exclude("com/bloomberg/selekt/ExternalSQLite*.class")
             exclude("META-INF/*.kotlin_module")
+            exclude("META-INF/native-image/com.bloomberg.selekt/selekt-sqlite3-classes-jni/**")
         }
     }
 }

@@ -20,7 +20,33 @@ import org.gradle.api.attributes.Category
 import org.gradle.api.attributes.LibraryElements
 import org.gradle.api.attributes.Usage
 import org.gradle.api.attributes.java.TargetJvmVersion
+import org.gradle.api.file.ConfigurableFileCollection
+import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Classpath
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.OutputFile
+import org.gradle.jvm.toolchain.JvmVendorSpec
+import org.gradle.process.CommandLineArgumentProvider
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
+abstract class NativeImageArguments : CommandLineArgumentProvider {
+    @get:Classpath
+    abstract val runtimeClasspath: ConfigurableFileCollection
+
+    @get:OutputFile
+    abstract val outputFile: RegularFileProperty
+
+    @get:Input
+    abstract val mainClass: Property<String>
+
+    override fun asArguments(): Iterable<String> = listOf(
+        runtimeClasspath.asPath,
+        "-o",
+        outputFile.get().asFile.absolutePath,
+        mainClass.get()
+    )
+}
 
 description = "Selekt JDBC library."
 
@@ -188,6 +214,87 @@ val java25TestRuntimeClasspath = configurations.create("java25TestRuntimeClasspa
         attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 25)
         attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage.JAVA_RUNTIME))
     }
+}
+
+val nativeImageTestSourceSet = sourceSets.create("nativeImageTest") {
+    compileClasspath += sourceSets.main.get().output
+}
+
+fun nativeImageRuntimeClasspath(backend: String, targetJvmVersion: Int) = configurations.create(
+    "nativeImage${backend}RuntimeClasspath"
+) {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    extendsFrom(configurations.implementation.get(), configurations.runtimeOnly.get())
+    attributes {
+        attribute(Bundling.BUNDLING_ATTRIBUTE, objects.named(Bundling.EXTERNAL))
+        attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category.LIBRARY))
+        attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements.JAR))
+        attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, targetJvmVersion)
+        attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage.JAVA_RUNTIME))
+    }
+}
+
+tasks.named<JavaCompile>(nativeImageTestSourceSet.compileJavaTaskName) {
+    javaCompiler.set(javaToolchains.compilerFor {
+        languageVersion.set(JavaLanguageVersion.of(11))
+    })
+    options.release.set(11)
+}
+
+fun nativeImageExecutable(javaVersion: Int) = javaToolchains.launcherFor {
+    languageVersion.set(JavaLanguageVersion.of(javaVersion))
+    vendor.set(JvmVendorSpec.GRAAL_VM)
+}.map { launcher ->
+    val suffix = if (System.getProperty("os.name").startsWith("Windows")) ".cmd" else ""
+    launcher.metadata.installationPath.file("bin/native-image$suffix").asFile
+}
+fun registerNativeImageTest(
+    backend: String,
+    targetJvmVersion: Int,
+    graalVmVersion: Int
+): TaskProvider<Exec> {
+    val capitalizedBackend = backend.replaceFirstChar(Char::uppercase)
+    val runtimeClasspath = files(
+        nativeImageTestSourceSet.output,
+        sourceSets.main.get().output,
+        nativeImageRuntimeClasspath(capitalizedBackend, targetJvmVersion)
+    )
+    val executableSuffix = if (System.getProperty("os.name").startsWith("Windows")) ".exe" else ""
+    val output = layout.buildDirectory.file("selekt-native-image-$backend-smoke$executableSuffix")
+    val arguments = objects.newInstance<NativeImageArguments>().apply {
+        this.runtimeClasspath.from(runtimeClasspath)
+        outputFile.set(output)
+        mainClass.set("com.bloomberg.selekt.jdbc.GraalVmNativeImageSmoke")
+    }
+    val compile = tasks.register<Exec>("nativeImage${capitalizedBackend}Compile") {
+        description = "Builds the GraalVM Native Image $backend smoke executable."
+        group = "verification"
+        dependsOn(nativeImageTestSourceSet.classesTaskName, "buildHostSQLite")
+        inputs.files(runtimeClasspath)
+        outputs.file(output)
+        executable(nativeImageExecutable(graalVmVersion).get().absolutePath)
+        if (graalVmVersion < 25) {
+            args("--no-fallback")
+        }
+        args("-cp")
+        argumentProviders.add(arguments)
+    }
+    return tasks.register<Exec>("nativeImage${capitalizedBackend}Test") {
+        description = "Runs the GraalVM Native Image $backend smoke executable."
+        group = "verification"
+        dependsOn(compile)
+        executable(output.get().asFile.absolutePath)
+    }
+}
+
+val nativeImageJniTest = registerNativeImageTest("jni", 11, 21)
+val nativeImageFfmTest = registerNativeImageTest("ffm", 25, 25)
+
+tasks.register("nativeImageTest") {
+    description = "Runs the GraalVM Native Image JNI and FFM smoke executables."
+    group = "verification"
+    dependsOn(nativeImageJniTest, nativeImageFfmTest)
 }
 
 val jvmFuzzMetadataSqlIsolationJava25 = tasks.register<Test>("jvmFuzzMetadataSqlIsolationJava25") {

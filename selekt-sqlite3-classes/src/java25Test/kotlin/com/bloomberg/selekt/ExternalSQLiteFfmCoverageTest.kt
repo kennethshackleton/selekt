@@ -21,7 +21,6 @@ import java.lang.foreign.Arena
 import java.lang.foreign.FunctionDescriptor
 import java.lang.foreign.Linker
 import java.lang.foreign.MemorySegment
-import java.lang.foreign.SymbolLookup
 import java.lang.foreign.ValueLayout
 import java.lang.invoke.MethodHandle
 import java.lang.reflect.InvocationTargetException
@@ -51,9 +50,8 @@ internal class ExternalSQLiteFfmCoverageTest {
     private val sqlite = externalSQLiteSingleton()
     private val externalType = Class.forName("com.bloomberg.selekt.ExternalSQLite")
     private val normalizedSqlHandle by lazy {
-        val symbol = SymbolLookup.loaderLookup().find("sqlite3_normalized_sql").orElseThrow()
         Linker.nativeLinker().downcallHandle(
-            symbol,
+            ExternalSQLite.findNativeSymbol("sqlite3_normalized_sql"),
             FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS)
         )
     }

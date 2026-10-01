@@ -91,7 +91,12 @@ internal fun libraryNames(
 }
 
 @Throws(IOException::class)
-fun loadEmbeddedLibrary(loader: ClassLoader, parentDirectory: String, name: String) {
+fun <T> withEmbeddedLibraryFile(
+    loader: ClassLoader,
+    parentDirectory: String,
+    name: String,
+    action: (File) -> T
+): T {
     val url = checkNotNull(libraryNames(parentDirectory, name).firstNotNullOfOrNull(loader::getResource)) {
         "Failed to find resource with name: $name in directory: $parentDirectory"
     }
@@ -102,11 +107,38 @@ fun loadEmbeddedLibrary(loader: ClassLoader, parentDirectory: String, name: Stri
         url.openStream().use { inputStream ->
             FileOutputStream(file).use(inputStream::copyTo)
         }
-        @Suppress("UnsafeDynamicallyLoadedCode")
-        System.load(file.absolutePath)
+        return action(file)
     } finally {
         file.delete()
     }
+}
+
+@Throws(IOException::class)
+fun loadEmbeddedLibrary(loader: ClassLoader, parentDirectory: String, name: String) {
+    withEmbeddedLibraryFile(loader, parentDirectory, name) { file ->
+        @Suppress("UnsafeDynamicallyLoadedCode")
+        System.load(file.absolutePath)
+    }
+}
+
+@Suppress("NewApi")
+private fun libraryFile(
+    libraryPath: String,
+    parentDirectory: String,
+    name: String
+): File = libraryNames(parentDirectory, name).map {
+    Path(libraryPath, it)
+}.first(Files::exists).toAbsolutePath().toFile()
+
+@Throws(IOException::class)
+fun <T> withLibraryFile(
+    loader: ClassLoader,
+    parentDirectory: String,
+    name: String,
+    action: (File) -> T
+): T = when (val libraryPath = System.getProperty(LIBRARY_PATH_KEY)) {
+    null -> withEmbeddedLibraryFile(loader, parentDirectory, name, action)
+    else -> action(libraryFile(libraryPath, parentDirectory, name))
 }
 
 @Suppress("NewApi")
@@ -115,11 +147,9 @@ private fun loadLibrary(
     parentDirectory: String,
     name: String
 ) {
-    val path = libraryNames(parentDirectory, name).map {
-        Path(libraryPath, it)
-    }.first(Files::exists).toAbsolutePath()
+    val file = libraryFile(libraryPath, parentDirectory, name)
     @Suppress("UnsafeDynamicallyLoadedCode")
-    System.load(path.toString())
+    System.load(file.absolutePath)
 }
 
 @Throws(IOException::class)

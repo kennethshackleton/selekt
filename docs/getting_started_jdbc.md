@@ -4,6 +4,25 @@ Selekt JDBC supports Java 11 and later. For new projects, we recommend the curre
 
 Maven does not consume Gradle variant metadata. Maven consumers therefore receive the unclassified Java 11 JNI backend on every supported Java version, including Java 25 or later. FFM backend selection is not currently supported for Maven consumers.
 
+### GraalVM Native Image
+
+Selekt supports GraalVM Native Image for applications targeting Java 11 and later. Gradle selects the JNI backend for
+targets from Java 11 through Java 24 and the FFM backend for Java 25 or later. The published variants contain the
+native-library resource configuration, JNI or FFM reachability metadata, and runtime-initialization settings required
+by Native Image. No application-specific JNI, reflection, or resource configuration is required.
+
+The Maven dependency path supports Native Image through Selekt's Java 11 JNI backend, including when Maven itself runs
+on a newer Java version. Native images are platform-specific; the `selekt-sqlite3-sqlcipher` dependency must contain a
+native library for the image's target operating system and architecture.
+
+Selekt's end-to-end checks build and run the JNI executable with GraalVM 21 and the FFM executable with GraalVM 25:
+
+``` shell
+./gradlew :selekt-jdbc:nativeImageTest
+```
+
+The individual tasks are `nativeImageJniTest` and `nativeImageFfmTest`.
+
 ### Gradle
 
 === "Kotlin"

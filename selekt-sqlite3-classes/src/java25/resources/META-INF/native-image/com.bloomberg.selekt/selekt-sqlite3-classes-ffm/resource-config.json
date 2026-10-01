@@ -1,0 +1,9 @@
+{
+  "resources": {
+    "includes": [
+      {
+        "pattern": "jni/.*/libselekt[.](dylib|so|dll)"
+      }
+    ]
+  }
+}

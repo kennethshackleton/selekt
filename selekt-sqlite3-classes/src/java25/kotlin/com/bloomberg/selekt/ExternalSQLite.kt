@@ -16,7 +16,7 @@
 
 package com.bloomberg.selekt
 
-import com.bloomberg.selekt.commons.loadLibrary
+import com.bloomberg.selekt.commons.withLibraryFile
 import java.lang.foreign.Arena
 import java.lang.foreign.FunctionDescriptor
 import java.lang.foreign.Linker
@@ -333,7 +333,9 @@ internal class ExternalSQLite(
 
     init {
         loader()
-        nativeInit(configuration.softHeapLimit)
+        check(selekt_native_init.invoke(configuration.softHeapLimit) as Int == SQL_OK) {
+            "SQLite initialization failed"
+        }
     }
 
     internal object Singleton {
@@ -1541,7 +1543,8 @@ internal class ExternalSQLite(
         db: Long
     ): Int = sqlite3_get_autocommit.invoke(MemorySegment.ofAddress(db)) as Int
 
-    external override fun gitCommit(): String
+    override fun gitCommit(): String =
+        (selekt_git_commit.invoke() as MemorySegment).run(MemorySegment::getConfinedString)
 
     override fun hardHeapLimit64(): Long = sqlite3_hard_heap_limit64.invoke(-1L) as Long
 
@@ -1770,7 +1773,7 @@ internal class ExternalSQLite(
         sqlite3_reset_and_clear_bindings.invoke(MemorySegment.ofAddress(statement)) as Int
     }
 
-    external override fun softHeapLimit64(): Long
+    override fun softHeapLimit64(): Long = sqlite3_soft_heap_limit64.invoke(-1L) as Long
 
     override fun sql(statement: Long): String = (sqlite3_sql.invoke(MemorySegment.ofAddress(statement)) as MemorySegment)
         .run(MemorySegment::getConfinedString)
@@ -1928,8 +1931,6 @@ internal class ExternalSQLite(
         return MethodHandles.catchException(target, Throwable::class.java, fallback)
     }
 
-    private external fun nativeInit(softHeapLimit: Long)
-
     companion object {
         private const val DIRECT_ASCII_BIND_MAX_LENGTH = 64
         private const val BLOB_SLAB_THRESHOLD = 2_048
@@ -1942,15 +1943,28 @@ internal class ExternalSQLite(
         private const val SQLITE_MAX_LENGTH = 1_000_000_000L
         private const val SQLITE_NULL = 5
 
-        init {
-            loadLibrary(checkNotNull(ExternalSQLite::class.java.classLoader), "jni", "selekt")
+        private val linker: Linker = Linker.nativeLinker()
+        private val symbolLookup: SymbolLookup = withLibraryFile(
+            checkNotNull(ExternalSQLite::class.java.classLoader),
+            "jni",
+            "selekt"
+        ) { library ->
+            SymbolLookup.libraryLookup(library.toPath(), Arena.global())
         }
 
-        private val linker: Linker = Linker.nativeLinker()
-        private val symbolLookup: SymbolLookup = SymbolLookup.loaderLookup()
+        internal fun findNativeSymbol(name: String): MemorySegment = symbolLookup.find(name).orElseThrow()
 
         private val sqliteTransient = MemorySegment.ofAddress(-1L)
         private val sqliteFree = symbolLookup.find("sqlite3_free").orElseThrow()
+
+        private val selekt_git_commit: MethodHandle = linker.downcallHandle(
+            symbolLookup.find("selekt_git_commit").orElseThrow(),
+            FunctionDescriptor.of(ADDRESS)
+        )
+        private val selekt_native_init: MethodHandle = linker.downcallHandle(
+            symbolLookup.find("selekt_native_init").orElseThrow(),
+            FunctionDescriptor.of(JAVA_INT, JAVA_LONG)
+        )
 
         private val criticalNoHeapOption = Linker.Option.critical(false)
 
@@ -2193,6 +2207,11 @@ internal class ExternalSQLite(
         )
         private val sqlite3_hard_heap_limit64: MethodHandle = linker.downcallHandle(
             symbolLookup.find("sqlite3_hard_heap_limit64").orElseThrow(),
+            FunctionDescriptor.of(JAVA_LONG, JAVA_LONG),
+            criticalNoHeapOption
+        )
+        private val sqlite3_soft_heap_limit64: MethodHandle = linker.downcallHandle(
+            symbolLookup.find("sqlite3_soft_heap_limit64").orElseThrow(),
             FunctionDescriptor.of(JAVA_LONG, JAVA_LONG),
             criticalNoHeapOption
         )
