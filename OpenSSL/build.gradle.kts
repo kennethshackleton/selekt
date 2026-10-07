@@ -88,8 +88,9 @@ tasks.register<Exec>("verifyOpenSslSignature") {
     val archivePath = archive.get().asFile.absolutePath.toMsysPath()
     doFirst {
         gpgHome.mkdirs()
-        gpgHome.resolve("trustdb.gpg").createNewFile()
-        signingKeyring.copyTo(gpgHome.resolve("pubring.kbx"), overwrite = true)
+        // An OpenPGP keyring rather than a keybox, and no empty trustdb, so that GnuPG 2.0 (e.g. CentOS 7, as used to
+        // build against glibc 2.17) can verify as well as GnuPG 2.1+.
+        signingKeyring.copyTo(gpgHome.resolve("pubring.gpg"), overwrite = true)
     }
     commandLine(
         "gpg", "--batch", "--no-auto-key-retrieve", "--homedir", gpgHomePath,

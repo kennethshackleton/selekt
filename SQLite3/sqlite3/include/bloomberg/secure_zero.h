@@ -20,7 +20,17 @@
 #include <cstddef>
 #include <cstring>
 
-#if defined(__GLIBC__) || (defined(__ANDROID_API__) && __ANDROID_API__ >= 28)
+// explicit_bzero arrived in glibc 2.25. Using it on older glibc would raise the library's runtime glibc floor
+// beyond what some Linux distributions (e.g. RHEL 7, glibc 2.17) provide, so fall back for those.
+#if defined(__GLIBC__)
+#if __GLIBC_PREREQ(2, 25)
+#define SELEKT_HAVE_EXPLICIT_BZERO 1
+#endif
+#elif defined(__ANDROID_API__) && __ANDROID_API__ >= 28
+#define SELEKT_HAVE_EXPLICIT_BZERO 1
+#endif
+
+#if defined(SELEKT_HAVE_EXPLICIT_BZERO)
 #include <strings.h>
 #endif
 
@@ -28,7 +38,7 @@ namespace selekt {
     inline void secure_zero(unsigned char* p, size_t n) {
 #if defined(__cpp_lib_memset_explicit) || (defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202311L)
         memset_explicit(p, 0, n);
-#elif defined(__GLIBC__) || (defined(__ANDROID_API__) && __ANDROID_API__ >= 28)
+#elif defined(SELEKT_HAVE_EXPLICIT_BZERO)
         explicit_bzero(p, n);
 #else
         volatile unsigned char* pp = p;
